@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ИНЕЙ✸ — Архив холода</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,200;9..144,300;9..144,400&family=JetBrains+Mono:wght@200;300;400&family=Unbounded:wght@300;500;700&family=Caveat:wght@500;700&family=Rubik+Mono+One&family=Oswald:wght@300;500;700&family=Cormorant+Garamond:ital,wght@1,300;1,500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #050608;
+    --ink: #e7eef6;
+    --ice-1: #f4f8ff;
+    --ice-2: #8aabd1;
+    --ice-3: #4a6b94;
+    --aurora-1: #ff7ab6;
+    --aurora-2: #66c8ff;
+    --aurora-3: #9fffd9;
+  }
+  html, body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    cursor: crosshair;
+  }
+  body { min-height: 700vh; }
+  
+  /* ===================================================================
+     LOADER
+     =================================================================== */
+  #loader {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: #050608;
+    display: grid;
+    place-items: center;
+    transition: opacity 1.1s cubic-bezier(.2,.8,.2,1), visibility 1.1s;
+  }
+  #loader.hidden {
+    opacity: 0;
+    visibility: hidden;
+  }
+  /* tiny drifting particles on loader bg */
+  #loader::before, #loader::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle at 23% 14%, rgba(150,200,255,0.4) 0.5px, transparent 1px),
+                      radial-gradient(circle at 78% 81%, rgba(150,200,255,0.4) 0.5px, transparent 1px),
+                      radial-gradient(circle at 12% 70%, rgba(180,210,255,0.3) 0.5px, transparent 1px),
+                      radial-gradient(circle at 65% 30%, rgba(150,200,255,0.4) 0.5px, transparent 1px),
+                      radial-gradient(circle at 88% 12%, rgba(180,210,255,0.3) 0.5px, transparent 1px),
+                      radial-gradient(circle at 40% 88%, rgba(150,200,255,0.4) 0.5px, transparent 1px);
+    background-size: 300px 300px, 250px 250px, 380px 380px, 220px 220px, 340px 340px, 270px 270px;
+    animation: drift-particles 20s linear infinite;
+    pointer-events: none;
+    opacity: 0.7;
+  }
+  #loader::after {
+    animation-direction: reverse;
+    animation-duration: 30s;
+    opacity: 0.5;
+  }
+  @keyframes drift-particles {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-100px); }
+  }
+  .loader-inner {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 38px;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+  }
+  .loader-wordmark {
+    font-family: 'Fraunces', serif;
+    font-variation-settings: "opsz" 144;
+    font-weight: 200;
+    font-style: italic;
+    font-size: clamp(64px, 12vw, 160px);
+    letter-spacing: 0.04em;
+    line-height: 1;
+    background: linear-gradient(180deg, #ffffff 0%, var(--ice-2) 70%, var(--ice-3) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: flex;
+    align-items: center;
+    gap: 0.04em;
+  }
+  .loader-wordmark .letter {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(40px) rotate(-2deg);
+    animation: letter-rise 1s cubic-bezier(.18,.84,.24,1) forwards;
+    -webkit-text-fill-color: transparent;
+    background: inherit;
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+  .loader-wordmark .letter:nth-child(1) { animation-delay: 0.05s; }
+  .loader-wordmark .letter:nth-child(2) { animation-delay: 0.18s; }
+  .loader-wordmark .letter:nth-child(3) { animation-delay: 0.31s; }
+  .loader-wordmark .letter:nth-child(4) { animation-delay: 0.44s; }
+  .loader-wordmark .star {
+    color: var(--aurora-2);
+    -webkit-text-fill-color: var(--aurora-2);
+    font-size: 0.45em;
+    transform: translateY(-0.55em) scale(0);
+    opacity: 0;
+    margin-left: 0.05em;
+    text-shadow: 0 0 20px var(--aurora-2);
+    animation: star-pop 0.8s cubic-bezier(.18,1.6,.4,1) 0.65s forwards,
+               star-spin 6s linear 1.5s infinite;
+    transform-origin: center 50%;
+  }
+  @keyframes letter-rise {
+    to { opacity: 1; transform: translateY(0) rotate(0); }
+  }
+  @keyframes star-pop {
+    to { transform: translateY(-0.55em) scale(1); opacity: 1; }
+  }
+  @keyframes star-spin {
+    from { transform: translateY(-0.55em) scale(1) rotate(0); }
+    to   { transform: translateY(-0.55em) scale(1) rotate(360deg); }
+  }
+  
+  .loader-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 300;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--aurora-2);
+    opacity: 0;
+    animation: fade-in 0.6s ease 0.9s forwards;
+    min-height: 14px;
+    transition: opacity 0.3s;
+  }
+  .loader-status.swap { opacity: 0.2; }
+  
+  .loader-meter {
+    width: min(320px, 64vw);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+    opacity: 0;
+    animation: fade-in 0.8s ease 1.1s forwards;
+  }
+  .loader-bar {
+    width: 100%;
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+    position: relative;
+    overflow: visible;
+  }
+  .loader-fill {
+    position: absolute;
+    left: 0; top: -1px;
+    height: 3px;
+    background: linear-gradient(90deg, var(--aurora-3), var(--aurora-2));
+    width: 0%;
+    transition: width 0.5s cubic-bezier(.2,.8,.2,1);
+    box-shadow: 0 0 14px var(--aurora-2), 0 0 32px rgba(102,200,255,0.4);
+  }
+  .loader-fill::after {
+    content: '';
+    position: absolute;
+    right: -2px; top: -3px;
+    width: 7px; height: 9px;
+    background: var(--aurora-3);
+    box-shadow: 0 0 12px var(--aurora-3);
+    transform: skewX(-20deg);
+  }
+  .loader-readout {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    color: rgba(231,238,246,0.45);
+    text-transform: uppercase;
+  }
+  .loader-readout span:last-child { color: var(--ice-2); }
+  
+  @keyframes fade-in {
+    to { opacity: 1; }
+  }
+  
+  /* ===================================================================
+     CANVAS + ATMOSPHERIC LAYERS
+     =================================================================== */
+  #canvas {
+    position: fixed; inset: 0;
+    z-index: 0;
+    width: 100%; height: 100vh;
+    display: block;
+  }
+  .vignette {
+    position: fixed; inset: 0; z-index: 5;
+    background: radial-gradient(ellipse at center, transparent 25%, rgba(5,6,8,0.85) 85%);
+    pointer-events: none;
+  }
+  .grain {
+    position: fixed; inset: 0; z-index: 6;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.7 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='1'/></svg>");
+    opacity: 0.09;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+  }
+  .scanlines {
+    position: fixed; inset: 0; z-index: 7;
+    background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(255,255,255,0.012) 2px 3px);
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+  
+  /* ===================================================================
+     NAV
+     =================================================================== */
+  .nav {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 22px 32px;
+    z-index: 20;
+    mix-blend-mode: difference;
+    pointer-events: none;
+  }
+  .logo {
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-size: 18px;
+    letter-spacing: 0.18em;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .logo .star {
+    color: var(--aurora-2);
+    font-size: 14px;
+    transform: translateY(-4px);
+    animation: pulse 3s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.5; transform: translateY(-4px) rotate(0); }
+    50% { opacity: 1; transform: translateY(-4px) rotate(180deg); }
+  }
+  .menu {
+    display: flex; gap: 28px; align-items: center;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    font-weight: 300;
+    pointer-events: auto;
+  }
+  .menu span { cursor: pointer; opacity: 0.7; transition: opacity 0.3s; }
+  .menu span:hover { opacity: 1; }
+  
+  #sound-btn {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.4);
+    color: inherit;
+    font-family: inherit;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  #sound-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.8); }
+  #sound-btn .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #888;
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  #sound-btn.on .dot {
+    background: var(--aurora-3);
+    box-shadow: 0 0 8px var(--aurora-3);
+    animation: blink 1.6s ease-in-out infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  
+  /* ===================================================================
+     HUD + SCROLL UI
+     =================================================================== */
+  .hud {
+    position: fixed; left: 32px; bottom: 32px;
+    z-index: 20;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    line-height: 1.7;
+    color: rgba(231,238,246,0.45);
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+  .hud .row { display: flex; gap: 12px; }
+  .hud .row span:first-child { color: rgba(231,238,246,0.3); }
+  .hud .row span:last-child { color: var(--ice-2); }
+  
+  .progress-wrap {
+    position: fixed;
+    right: 32px; top: 50%;
+    transform: translateY(-50%);
+    z-index: 15;
+    display: flex; flex-direction: column; gap: 8px; align-items: center;
+  }
+  .progress-track {
+    width: 1px; height: 220px;
+    background: rgba(255,255,255,0.08);
+    position: relative;
+  }
+  .progress-bar {
+    position: absolute; left: -1px; top: 0;
+    width: 3px;
+    background: linear-gradient(180deg, var(--aurora-3), var(--ice-2));
+    height: 0%;
+    transition: height 0.3s cubic-bezier(.2,.8,.2,1);
+    box-shadow: 0 0 12px var(--aurora-2);
+  }
+  .progress-label {
+    font-size: 8px;
+    letter-spacing: 0.3em;
+    color: rgba(231,238,246,0.4);
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+  }
+  
+  .stage {
+    position: fixed; inset: 0;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .caption {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.8s cubic-bezier(.2,.8,.2,1);
+    width: min(92vw, 1000px);
+  }
+  .caption.in { opacity: 1; }
+  .caption .eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--aurora-2);
+    margin-bottom: 24px;
+    font-weight: 300;
+  }
+  .caption h1 {
+    font-family: 'Fraunces', serif;
+    font-variation-settings: "opsz" 144;
+    font-weight: 200;
+    font-style: italic;
+    font-size: clamp(54px, 11vw, 180px);
+    line-height: 0.92;
+    letter-spacing: -0.035em;
+    background: linear-gradient(180deg, #ffffff 0%, var(--ice-2) 60%, var(--ice-3) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 28px;
+  }
+  .caption h1 em {
+    font-style: normal;
+    font-weight: 300;
+    color: var(--aurora-1);
+    -webkit-text-fill-color: var(--aurora-1);
+  }
+  .caption .meta {
+    display: inline-flex; gap: 24px;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(231,238,246,0.55);
+    padding-top: 14px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .caption .meta span:first-child { color: var(--aurora-2); }
+  
+  .scroll-hint {
+    position: fixed; bottom: 30px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    font-size: 9px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: rgba(231,238,246,0.55);
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    animation: drift 2.6s ease-in-out infinite;
+    pointer-events: none;
+  }
+  .scroll-hint::after {
+    content: '';
+    width: 1px; height: 36px;
+    background: linear-gradient(180deg, var(--aurora-2), transparent);
+  }
+  @keyframes drift {
+    0%, 100% { transform: translate(-50%, 0); opacity: 0.5; }
+    50% { transform: translate(-50%, 8px); opacity: 1; }
+  }
+  
+  /* ===================================================================
+     OUTRO
+     =================================================================== */
+  .outro {
+    position: relative;
+    z-index: 12;
+    margin-top: 600vh;
+    padding: 80px 32px 40px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    background: linear-gradient(180deg, transparent, var(--bg) 30%);
+    pointer-events: auto;
+  }
+  .outro-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr;
+    gap: 60px;
+  }
+  .outro h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 200;
+    font-style: italic;
+    font-size: clamp(36px, 5vw, 64px);
+    line-height: 1.0;
+    letter-spacing: -0.03em;
+    background: linear-gradient(180deg, #fff, var(--ice-3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .outro h3 {
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--aurora-2);
+    margin-bottom: 16px;
+    font-weight: 300;
+  }
+  .outro ul { list-style: none; font-size: 12px; line-height: 2.1; color: rgba(231,238,246,0.7); }
+  .outro li { display: flex; justify-content: space-between; gap: 12px; }
+  .outro li span:last-child { color: rgba(231,238,246,0.3); font-size: 10px; }
+  .outro-foot {
+    max-width: 1100px;
+    margin: 70px auto 0;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex; justify-content: space-between;
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: rgba(231,238,246,0.35);
+  }
+  
+  /* ===================================================================
+     OVERPULL INDICATOR (bottom-of-page secret trigger)
+     =================================================================== */
+  #overpull {
+    position: fixed;
+    left: 50%; bottom: 28px;
+    transform: translateX(-50%);
+    z-index: 80;
+    opacity: 0;
+    transition: opacity 0.4s;
+    pointer-events: none;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+  }
+  #overpull.show { opacity: 1; }
+  .overpull-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--aurora-2);
+    text-shadow: 0 0 8px rgba(102,200,255,0.4);
+  }
+  .overpull-bar {
+    width: 240px;
+    height: 1px;
+    background: rgba(255,255,255,0.12);
+    position: relative;
+  }
+  .overpull-fill {
+    position: absolute;
+    left: 50%; top: -1px;
+    height: 3px;
+    background: var(--aurora-3);
+    width: 0%;
+    transform: translateX(-50%);
+    transition: width 0.08s linear;
+    box-shadow: 0 0 10px var(--aurora-3);
+  }
+  
+  /* ===================================================================
+     SECRET LOCATION
+     =================================================================== */
+  #secret {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: #000;
+    display: grid;
+    place-items: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 1.6s cubic-bezier(.2,.8,.2,1), visibility 1.6s;
+    pointer-events: none;
+  }
+  #secret.in {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  .secret-inner {
+    text-align: center;
+    transform: translateY(28px);
+    opacity: 0;
+    transition: transform 1.8s cubic-bezier(.2,.8,.2,1) 0.2s,
+                opacity 1.8s cubic-bezier(.2,.8,.2,1) 0.2s;
+    padding: 0 24px;
+  }
+  #secret.in .secret-inner {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  .secret-inner h1 {
+    font-family: 'Fraunces', serif;
+    font-variation-settings: "opsz" 144;
+    font-style: italic;
+    font-weight: 200;
+    font-size: clamp(48px, 9vw, 132px);
+    line-height: 0.98;
+    letter-spacing: -0.03em;
+    color: #f4f8ff;
+    margin-bottom: 40px;
+  }
+  .secret-inner p {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 300;
+    font-size: clamp(16px, 2vw, 22px);
+    letter-spacing: 0.15em;
+    color: rgba(244,248,255,0.55);
+  }
+  .secret-back {
+    position: fixed;
+    left: 50%; bottom: 32px;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: rgba(244,248,255,0.3);
+    opacity: 0;
+    transition: opacity 1s ease 1.8s;
+    pointer-events: none;
+  }
+  #secret.in .secret-back { opacity: 1; }
+  
+  @media (max-width: 720px) {
+    .outro-inner { grid-template-columns: 1fr; gap: 36px; }
+    .progress-wrap { right: 14px; }
+    .progress-track { height: 140px; }
+    .nav { padding: 18px 18px; }
+    .menu { gap: 14px; font-size: 9px; }
+    .hud { left: 14px; bottom: 14px; font-size: 8px; }
+    #sound-btn { padding: 5px 8px; font-size: 9px; }
+    .overpull-bar { width: 180px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== LOADER ===================== -->
+<div id="loader">
+  <div class="loader-inner">
+    <div class="loader-wordmark">
+      <span class="letter">И</span><span class="letter">Н</span><span class="letter">Е</span><span class="letter">Й</span><span class="star">✸</span>
+    </div>
+    <div class="loader-status" id="loader-status">Готовим спуск</div>
+    <div class="loader-meter">
+      <div class="loader-bar"><div class="loader-fill" id="loader-fill"></div></div>
+      <div class="loader-readout">
+        <span>Этап загрузки</span>
+        <span id="loader-percent">000%</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<canvas id="canvas"></canvas>
+<div class="vignette"></div>
+<div class="scanlines"></div>
+<div class="grain"></div>
+
+<nav class="nav">
+  <div class="logo">Иней<span class="star">✸</span></div>
+  <div class="menu">
+    <span>Опись</span>
+    <span>Объекты</span>
+    <span>Студия</span>
+    <button id="sound-btn"><span class="dot"></span><span id="sound-label">Звук · Выкл</span></button>
+  </div>
+</nav>
+
+<div class="hud">
+  <div class="row"><span>ШИР</span><span id="hud-lat">78.220°с.ш.</span></div>
+  <div class="row"><span>ДОЛГ</span><span id="hud-lon">15.651°в.д.</span></div>
+  <div class="row"><span>ГЛУБ</span><span id="hud-depth">0000 м</span></div>
+  <div class="row"><span>ТЕМП</span><span>−38.4°C</span></div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-label">СПУСК</div>
+  <div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div>
+</div>
+
+<div class="stage">
+  <div class="caption" data-i="0">
+    <div class="eyebrow">Студия · с MMXXVI</div>
+    <h1>Архив,<br>что <em>не тает.</em></h1>
+    <div class="meta"><span>◍ Объект 00</span><span>Иней · оммаж</span></div>
+  </div>
+  <div class="caption" data-i="1">
+    <div class="eyebrow">Глубина 01 · Память</div>
+    <h1>Имена,<br><em>которых нет.</em></h1>
+    <div class="meta"><span>◍ Объект 01</span><span>опись с 1937</span></div>
+  </div>
+  <div class="caption" data-i="2">
+    <div class="eyebrow">Глубина 02 · Голоса</div>
+    <h1>Хор<br>под <em>коркой.</em></h1>
+    <div class="meta"><span>◍ Объект 02</span><span>шесть голосов</span></div>
+  </div>
+  <div class="caption" data-i="3">
+    <div class="eyebrow">Глубина 03 · Сны</div>
+    <h1>Сны<br><em>в стазисе.</em></h1>
+    <div class="meta"><span>◍ Объект 03</span><span>не вскрывать</span></div>
+  </div>
+  <div class="caption" data-i="4">
+    <div class="eyebrow">Конец спуска</div>
+    <h1>Дальше<br><em>только лёд.</em></h1>
+    <div class="meta"><span>◍ Объект ∞</span><span>хранится вечно</span></div>
+  </div>
+</div>
+
+<div class="scroll-hint">ПРОКРУТИ ВНИЗ</div>
+
+<section class="outro">
+  <div class="outro-inner">
+    <div>
+      <h3>Манифест</h3>
+      <h2>Мы пишем холодом,<br>чтобы помнили долго.</h2>
+    </div>
+    <div>
+      <h3>Опись</h3>
+      <ul>
+        <li><span>Объект 01 · Память</span><span>1937</span></li>
+        <li><span>Объект 02 · Голоса</span><span>1962</span></li>
+        <li><span>Объект 03 · Сны</span><span>1989</span></li>
+        <li><span>Объект 04 · [Опечатано]</span><span>Скоро</span></li>
+      </ul>
+    </div>
+    <div>
+      <h3>Координаты</h3>
+      <ul>
+        <li><span>База</span><span>Шпицберген · 78°с.ш.</span></li>
+        <li><span>Сигнал</span><span>/иней</span></li>
+        <li><span>Хроника</span><span>@inei_arkhiv</span></li>
+        <li><span>Связь</span><span>kholod@inei.arc</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="outro-foot">
+    <span>© MMXXVI — Оммаж, не аффилировано</span>
+    <span>Создано Клодом ✸</span>
+  </div>
+</section>
+
+<!-- Overpull indicator at the very bottom -->
+<div id="overpull">
+  <div class="overpull-label">Потяни сильнее</div>
+  <div class="overpull-bar"><div class="overpull-fill" id="overpull-fill"></div></div>
+</div>
+
+<!-- Secret hidden location -->
+<div id="secret">
+  <div class="secret-inner">
+    <h1>Мы всегда<br>рядом.</h1>
+    <p>@nyavke</p>
+  </div>
+  <div class="secret-back">↑ Прокрути вверх, чтобы вернуться</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+// ===================================================================
+//                            LOADER CONTROL
+// ===================================================================
+const Loader = {
+  el: document.getElementById('loader'),
+  fillEl: document.getElementById('loader-fill'),
+  statusEl: document.getElementById('loader-status'),
+  percentEl: document.getElementById('loader-percent'),
+  target: 0,
+  display: 0,
+  set(progress, text) {
+    this.target = progress;
+    if (text && text !== this.statusEl.textContent) {
+      this.statusEl.classList.add('swap');
+      setTimeout(() => {
+        this.statusEl.textContent = text;
+        this.statusEl.classList.remove('swap');
+      }, 180);
+    }
+  },
+  tick() {
+    if (this.display < this.target) {
+      const delta = (this.target - this.display) * 0.08;
+      this.display += Math.max(0.35, delta);
+      if (this.display > this.target) this.display = this.target;
+      this.fillEl.style.width = this.display + '%';
+      this.percentEl.textContent = String(Math.floor(this.display)).padStart(3, '0') + '%';
+    }
+  },
+  hide() {
+    this.el.classList.add('hidden');
+  }
+};
+const loaderInterval = setInterval(() => Loader.tick(), 30);
+
+// Initial stage
+Loader.set(20, 'Готовим спуск');
+// Three.js module imports already done by this point in script execution
+setTimeout(() => Loader.set(38, 'Бурим лёд'), 250);
+
+// ===================================================================
+//                            SCENE SETUP
+// ===================================================================
+const canvas = document.getElementById('canvas');
+const isMobile = window.matchMedia('(max-width: 720px)').matches;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050608);
+scene.fog = new THREE.FogExp2(0x050608, 0.045);
+
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 120);
+camera.position.set(0, 0, 7.5);
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+scene.add(new THREE.AmbientLight(0x1a2230, 0.4));
+const keyLight = new THREE.DirectionalLight(0xc8dcff, 1.4);
+keyLight.position.set(6, 12, 6);
+scene.add(keyLight);
+const fillLight = new THREE.DirectionalLight(0x4a5a78, 0.6);
+fillLight.position.set(-8, -4, -6);
+scene.add(fillLight);
+
+const aurora1 = new THREE.PointLight(0xff5fa4, 4.5, 18, 1.5);
+aurora1.position.set(-4, 1, 2);
+scene.add(aurora1);
+const aurora2 = new THREE.PointLight(0x4fbaff, 5, 20, 1.5);
+aurora2.position.set(4, -1, 2);
+scene.add(aurora2);
+const aurora3 = new THREE.PointLight(0x7fffcf, 3, 15, 1.5);
+aurora3.position.set(0, 3, -3);
+scene.add(aurora3);
+
+// Procedural ice shard geometry
+function makeIceShard(radius, detail, seed) {
+  const geo = new THREE.IcosahedronGeometry(radius, detail);
+  const pos = geo.attributes.position;
+  const v = new THREE.Vector3();
+  const rng = mulberry32(seed * 9301 | 0);
+  const growthCount = 6 + Math.floor(rng() * 5);
+  const growthPoints = [];
+  for (let g = 0; g < growthCount; g++) {
+    growthPoints.push(new THREE.Vector3(
+      (rng() - 0.5) * 2, (rng() - 0.5) * 2, (rng() - 0.5) * 2
+    ).normalize());
+  }
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    const n = v.clone().normalize();
+    const wobble =
+      Math.sin(n.x * 4.3 + seed) *
+      Math.cos(n.y * 5.1 + seed * 2.1) *
+      Math.sin(n.z * 6.7 + seed * 3.3);
+    let spike = 0;
+    for (const gp of growthPoints) {
+      const d = Math.max(0, n.dot(gp));
+      spike += Math.pow(d, 8) * 0.55;
+    }
+    const factor = 1 + wobble * 0.12 + spike;
+    v.multiplyScalar(factor);
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+function mulberry32(a) {
+  return function() {
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+}
+
+const iceMat = new THREE.MeshPhysicalMaterial({
+  color: 0xeaf2ff,
+  metalness: 0,
+  roughness: 0.08,
+  transmission: 0.86,
+  thickness: 1.8,
+  ior: 1.33,
+  attenuationColor: 0x9cc4ff,
+  attenuationDistance: 3.0,
+  iridescence: 0.9,
+  iridescenceIOR: 1.3,
+  iridescenceThicknessRange: [120, 760],
+  clearcoat: 1.0,
+  clearcoatRoughness: 0.08,
+  envMapIntensity: 1.6,
+});
+
+const stripePalettes = [
+  ['#ff3fa4', '#22e0ff'],
+  ['#ffd84d', '#ff5a36'],
+  ['#9fffd9', '#9b6bff'],
+  ['#ff8a3d', '#3d7fff'],
+  ['#ff5fa4', '#fff04d'],
+];
+
+function makeStripeTexture(colorA, colorB, angleDeg, stripeCount) {
+  const size = 512;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, size, size);
+  ctx.translate(size / 2, size / 2);
+  ctx.rotate(angleDeg * Math.PI / 180);
+  ctx.translate(-size, -size);
+  const stripeH = (size * 2) / stripeCount;
+  for (let i = 0; i < stripeCount; i++) {
+    ctx.fillStyle = i % 2 === 0 ? colorA : colorB;
+    ctx.fillRect(0, i * stripeH, size * 2, stripeH);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+const adSlogans = [
+  { font: '700 88px "Unbounded"',                 color: '#22e0ff', text: 'Хрупко. Очень.' },
+  { font: '700 100px "Caveat"',                   color: '#ffd84d', text: 'Не размораживать.' },
+  { font: '400 72px "Rubik Mono One"',            color: '#9fffd9', text: 'Объект 03 · Молчит' },
+  { font: '700 96px "Oswald"',                    color: '#ff8a3d', text: 'Беречь от тепла' },
+  { font: 'italic 500 92px "Cormorant Garamond"', color: '#ff5fa4', text: 'Помни холод.' },
+];
+
+function makeAdTexture(slogan) {
+  const W = 2048, H = 384;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  const grad = ctx.createLinearGradient(0, 0, W, 0);
+  grad.addColorStop(0,   'rgba(0,0,0,0)');
+  grad.addColorStop(0.5, 'rgba(0,0,0,0.55)');
+  grad.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, H/2 - 90, W, 180);
+  ctx.font = slogan.font;
+  ctx.fillStyle = slogan.color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = slogan.color;
+  ctx.shadowBlur = 24;
+  ctx.fillText(slogan.text, W / 2, H / 2);
+  ctx.shadowBlur = 0;
+  ctx.fillText(slogan.text, W / 2, H / 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+const shards = [];
+const SHARD_COUNT = 5;
+const SHARD_SPACING = 7.5;
+const detail = isMobile ? 2 : 3;
+
+function buildShards() {
+  for (let i = 0; i < SHARD_COUNT; i++) {
+    const radius = 1.3 + (i === 0 ? 0.4 : 0) + Math.random() * 0.4;
+    const group = new THREE.Group();
+    
+    const shardGeo = makeIceShard(radius, detail, i * 7.31 + 1);
+    const shard = new THREE.Mesh(shardGeo, iceMat);
+    group.add(shard);
+    
+    const innerGeo = makeIceShard(radius * 0.62, detail, i * 7.31 + 1);
+    const [cA, cB] = stripePalettes[i % stripePalettes.length];
+    const stripeAngle = (i * 27) % 180;
+    const stripeMap = makeStripeTexture(cA, cB, stripeAngle, 12 + i);
+    const innerMat = new THREE.MeshStandardMaterial({
+      color: 0x000000,
+      emissive: 0xffffff,
+      emissiveMap: stripeMap,
+      emissiveIntensity: 1.6,
+      metalness: 0.2,
+      roughness: 0.6,
+    });
+    const inner = new THREE.Mesh(innerGeo, innerMat);
+    inner.userData.spinX = 0.002 + Math.random() * 0.003;
+    inner.userData.spinY = 0.003 + Math.random() * 0.004;
+    group.add(inner);
+    group.userData.inner = inner;
+    
+    const adTex = makeAdTexture(adSlogans[i % adSlogans.length]);
+    const spriteMat = new THREE.SpriteMaterial({
+      map: adTex,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.scale.set(radius * 4.2, radius * 0.78, 1);
+    sprite.position.set(0, radius * 1.55, 0);
+    group.add(sprite);
+    group.userData.sprite = sprite;
+    
+    group.position.y = -i * SHARD_SPACING;
+    group.position.x = (i % 2 === 0 ? 1 : -1) * (0.4 + Math.random() * 0.6);
+    group.rotation.set(Math.random() * 0.4, Math.random() * Math.PI, Math.random() * 0.4);
+    group.userData.spinX = 0.0015 + Math.random() * 0.002;
+    group.userData.spinY = 0.002 + Math.random() * 0.0025;
+    group.userData.basePos = group.position.clone();
+    group.userData.baseScale = 1.0;
+    group.userData.pulseSpeed = 1.0 + Math.random() * 1.2;
+    group.userData.pulsePhase = Math.random() * Math.PI * 2;
+    group.userData.pulseAmp = 0.09 + Math.random() * 0.06;
+    group.userData.radius = radius;
+    
+    scene.add(group);
+    shards.push(group);
+  }
+  
+  // Background decorative shards
+  for (let i = 0; i < (isMobile ? 6 : 14); i++) {
+    const g = makeIceShard(0.3 + Math.random() * 0.25, 1, 100 + i * 3);
+    const m = new THREE.Mesh(g, iceMat);
+    m.position.set(
+      (Math.random() - 0.5) * 24,
+      -Math.random() * (SHARD_COUNT * SHARD_SPACING),
+      -3 - Math.random() * 8
+    );
+    m.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+    m.userData.spin = 0.0008 + Math.random() * 0.0015;
+    m.userData.bg = true;
+    scene.add(m);
+    shards.push(m);
+  }
+}
+
+// Loader stages tied to actual work
+function bootSequence() {
+  Loader.set(58, 'Растим кристаллы');
+  // build shards (small synchronous chunk)
+  requestAnimationFrame(() => {
+    buildShards();
+    Loader.set(82, 'Зажигаем сияние');
+    setTimeout(() => Loader.set(95, 'Свободный спуск'), 500);
+    setTimeout(() => Loader.set(100, 'Архив открыт'), 1000);
+    setTimeout(() => Loader.hide(), 1700);
+  });
+}
+
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(bootSequence);
+} else {
+  setTimeout(bootSequence, 200);
+}
+
+// Background dust
+const dustCount = isMobile ? 400 : 1000;
+const dustGeo = new THREE.BufferGeometry();
+const dustPos = new Float32Array(dustCount * 3);
+const dustSpeed = new Float32Array(dustCount);
+for (let i = 0; i < dustCount; i++) {
+  dustPos[i*3]   = (Math.random() - 0.5) * 50;
+  dustPos[i*3+1] = (Math.random() - 0.5) * 80;
+  dustPos[i*3+2] = (Math.random() - 0.5) * 30 - 4;
+  dustSpeed[i] = 0.002 + Math.random() * 0.008;
+}
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({
+  color: 0xb6cce4, size: 0.025, transparent: true, opacity: 0.55,
+  depthWrite: false, blending: THREE.AdditiveBlending,
+}));
+scene.add(dust);
+
+// ===================================================================
+//                            AUDIO ENGINE
+// ===================================================================
+const audio = { ctx: null, master: null, enabled: false };
+
+function initAudio() {
+  if (audio.ctx) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  audio.ctx = new AC();
+  const ctx = audio.ctx;
+  audio.master = ctx.createGain();
+  audio.master.gain.value = 0;
+  audio.master.connect(ctx.destination);
+  
+  const droneGain = ctx.createGain();
+  droneGain.gain.value = 0.20;
+  const droneFilter = ctx.createBiquadFilter();
+  droneFilter.type = 'lowpass';
+  droneFilter.frequency.value = 600;
+  droneFilter.Q.value = 1.2;
+  droneGain.connect(droneFilter);
+  droneFilter.connect(audio.master);
+  
+  const padFreqs = [110, 165, 220, 277.18];
+  padFreqs.forEach((f, i) => {
+    const osc = ctx.createOscillator();
+    osc.type = i % 2 === 0 ? 'sine' : 'triangle';
+    osc.frequency.value = f * (1 + (Math.random() - 0.5) * 0.004);
+    const g = ctx.createGain();
+    g.gain.value = 0.25;
+    osc.connect(g);
+    g.connect(droneGain);
+    osc.start();
+  });
+  
+  const lfo = ctx.createOscillator();
+  lfo.frequency.value = 0.08;
+  const lfoGain = ctx.createGain();
+  lfoGain.gain.value = 350;
+  lfo.connect(lfoGain);
+  lfoGain.connect(droneFilter.frequency);
+  lfo.start();
+  
+  const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  const nd = noiseBuf.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * 0.4;
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuf;
+  noise.loop = true;
+  const noiseHP = ctx.createBiquadFilter();
+  noiseHP.type = 'highpass';
+  noiseHP.frequency.value = 600;
+  const noiseLP = ctx.createBiquadFilter();
+  noiseLP.type = 'lowpass';
+  noiseLP.frequency.value = 1800;
+  noiseLP.Q.value = 0.7;
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.value = 0.05;
+  noise.connect(noiseHP);
+  noiseHP.connect(noiseLP);
+  noiseLP.connect(noiseGain);
+  noiseGain.connect(audio.master);
+  noise.start();
+  
+  const wlfo = ctx.createOscillator();
+  wlfo.frequency.value = 0.15;
+  const wlfoGain = ctx.createGain();
+  wlfoGain.gain.value = 600;
+  wlfo.connect(wlfoGain);
+  wlfoGain.connect(noiseLP.frequency);
+  wlfo.start();
+}
+
+function playChime(shardIndex) {
+  if (!audio.enabled || !audio.ctx) return;
+  const ctx = audio.ctx;
+  const now = ctx.currentTime;
+  const scale = [880, 1108, 1318, 1568, 1760];
+  const base = scale[shardIndex % scale.length];
+  [1, 2.01, 3.03].forEach((mult, i) => {
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = base * mult;
+    const g = ctx.createGain();
+    const peak = 0.22 / (i + 1);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(peak, now + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 2.2 + i * 0.4);
+    o.connect(g);
+    g.connect(audio.master);
+    o.start(now);
+    o.stop(now + 2.6 + i * 0.4);
+  });
+}
+
+// Low warm chime for secret reveal
+function playSecretChime() {
+  if (!audio.enabled || !audio.ctx) return;
+  const ctx = audio.ctx;
+  const now = ctx.currentTime;
+  [220, 277.18, 329.63, 415.30].forEach((f, i) => {
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = f;
+    const g = ctx.createGain();
+    const peak = 0.18 / (i + 1);
+    g.gain.setValueAtTime(0, now + i * 0.05);
+    g.gain.linearRampToValueAtTime(peak, now + 0.08 + i * 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 5);
+    o.connect(g);
+    g.connect(audio.master);
+    o.start(now + i * 0.05);
+    o.stop(now + 5.5);
+  });
+}
+
+const soundBtn = document.getElementById('sound-btn');
+const soundLabel = document.getElementById('sound-label');
+soundBtn.addEventListener('click', () => {
+  if (!audio.ctx) initAudio();
+  if (audio.ctx && audio.ctx.state === 'suspended') audio.ctx.resume();
+  audio.enabled = !audio.enabled;
+  soundBtn.classList.toggle('on', audio.enabled);
+  soundLabel.textContent = 'Звук · ' + (audio.enabled ? 'Вкл' : 'Выкл');
+  if (audio.master) {
+    audio.master.gain.cancelScheduledValues(audio.ctx.currentTime);
+    audio.master.gain.linearRampToValueAtTime(
+      audio.enabled ? 0.6 : 0.0,
+      audio.ctx.currentTime + 1.2
+    );
+  }
+});
+
+// ===================================================================
+//                            INTERACTION
+// ===================================================================
+let scrollTarget = 0;
+let scrollSmoothed = 0;
+let mouseX = 0, mouseY = 0;
+let mouseTX = 0, mouseTY = 0;
+
+const maxScroll = () => Math.max(1, document.body.scrollHeight - window.innerHeight);
+
+window.addEventListener('scroll', () => { scrollTarget = window.scrollY; }, { passive: true });
+window.addEventListener('mousemove', (e) => {
+  mouseTX = (e.clientX / window.innerWidth - 0.5);
+  mouseTY = (e.clientY / window.innerHeight - 0.5);
+});
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ===================================================================
+//                  OVERPULL → SECRET LOCATION
+// ===================================================================
+const OVERPULL_THRESHOLD = 700;
+let overpull = 0;
+let secretShown = false;
+
+const overpullEl = document.getElementById('overpull');
+const overpullFill = document.getElementById('overpull-fill');
+const secretEl = document.getElementById('secret');
+
+function isAtBottom() {
+  return (window.innerHeight + window.scrollY) >= document.body.scrollHeight - 4;
+}
+
+function updateOverpullUI() {
+  const ratio = Math.min(1, overpull / OVERPULL_THRESHOLD);
+  overpullFill.style.width = (ratio * 100) + '%';
+  const visible = !secretShown && (isAtBottom() || overpull > 0);
+  overpullEl.classList.toggle('show', visible);
+}
+
+function showSecret() {
+  if (secretShown) return;
+  secretShown = true;
+  overpull = 0;
+  overpullEl.classList.remove('show');
+  secretEl.classList.add('in');
+  playSecretChime();
+}
+
+function hideSecret() {
+  if (!secretShown) return;
+  secretShown = false;
+  secretEl.classList.remove('in');
+  overpull = 0;
+  updateOverpullUI();
+}
+
+// Wheel input
+window.addEventListener('wheel', (e) => {
+  if (secretShown) {
+    if (e.deltaY < -2) hideSecret();
+    return;
+  }
+  if (isAtBottom() && e.deltaY > 0) {
+    overpull += e.deltaY * 0.85;
+    overpull = Math.min(overpull, OVERPULL_THRESHOLD * 1.15);
+    updateOverpullUI();
+    if (overpull >= OVERPULL_THRESHOLD) showSecret();
+  } else if (e.deltaY < 0 && overpull > 0) {
+    overpull = Math.max(0, overpull - Math.abs(e.deltaY) * 1.5);
+    updateOverpullUI();
+  }
+}, { passive: true });
+
+// Touch input (mobile-friendly): track delta, also feed mouseTX/TY for parallax
+let lastTouchY = null;
+window.addEventListener('touchstart', (e) => {
+  if (e.touches[0]) {
+    lastTouchY = e.touches[0].clientY;
+    mouseTX = (e.touches[0].clientX / window.innerWidth - 0.5);
+    mouseTY = (e.touches[0].clientY / window.innerHeight - 0.5);
+  }
+}, { passive: true });
+
+window.addEventListener('touchmove', (e) => {
+  if (!e.touches[0]) return;
+  const x = e.touches[0].clientX;
+  const y = e.touches[0].clientY;
+  // parallax
+  mouseTX = (x / window.innerWidth - 0.5);
+  mouseTY = (y / window.innerHeight - 0.5);
+  
+  if (lastTouchY === null) { lastTouchY = y; return; }
+  const dy = lastTouchY - y; // positive = swiping up content = scrolling down
+  lastTouchY = y;
+  
+  if (secretShown) {
+    if (dy < -8) hideSecret();
+    return;
+  }
+  if (isAtBottom() && dy > 0) {
+    overpull += dy * 3.2;
+    overpull = Math.min(overpull, OVERPULL_THRESHOLD * 1.15);
+    updateOverpullUI();
+    if (overpull >= OVERPULL_THRESHOLD) showSecret();
+  } else if (dy < 0 && overpull > 0) {
+    overpull = Math.max(0, overpull + dy * 4);
+    updateOverpullUI();
+  }
+}, { passive: true });
+
+window.addEventListener('touchend', () => { lastTouchY = null; }, { passive: true });
+
+// Decay overpull when idle (rubber-band release)
+setInterval(() => {
+  if (overpull > 0 && !secretShown) {
+    overpull = Math.max(0, overpull - 14);
+    updateOverpullUI();
+  } else if (!secretShown) {
+    // refresh "show" state in case we just reached bottom via scroll
+    updateOverpullUI();
+  }
+}, 60);
+
+// ===================================================================
+//                            UI UPDATES
+// ===================================================================
+const captions = document.querySelectorAll('.caption');
+const progressBar = document.getElementById('progress-bar');
+const hudDepth = document.getElementById('hud-depth');
+const hudLat = document.getElementById('hud-lat');
+const hudLon = document.getElementById('hud-lon');
+
+function updateUI(progress) {
+  const sectionCount = captions.length;
+  const idx = Math.min(sectionCount - 1, Math.floor(progress * sectionCount * 0.999));
+  captions.forEach((el, i) => el.classList.toggle('in', i === idx));
+  progressBar.style.height = (progress * 100).toFixed(2) + '%';
+  hudDepth.textContent = String(Math.floor(progress * 9420)).padStart(4, '0') + ' м';
+  hudLat.textContent = (78.220 + progress * 0.014).toFixed(3) + '°с.ш.';
+  hudLon.textContent = (15.651 + progress * 0.022).toFixed(3) + '°в.д.';
+}
+
+// ===================================================================
+//                            RENDER LOOP
+// ===================================================================
+const clock = new THREE.Clock();
+let lastChimeIdx = -1;
+
+function frame() {
+  requestAnimationFrame(frame);
+  const t = clock.getElapsedTime();
+  
+  scrollSmoothed += (scrollTarget - scrollSmoothed) * 0.07;
+  mouseX += (mouseTX - mouseX) * 0.05;
+  mouseY += (mouseTY - mouseY) * 0.05;
+  
+  const progress = scrollSmoothed / maxScroll();
+  const totalDescent = (SHARD_COUNT - 1) * SHARD_SPACING;
+  camera.position.y = -progress * totalDescent;
+  camera.position.x = mouseX * 1.4 + Math.sin(t * 0.18) * 0.25;
+  camera.position.z = 7.5 - Math.abs(Math.sin(progress * Math.PI * SHARD_COUNT)) * 1.2 + mouseY * 0.6;
+  camera.lookAt(0, camera.position.y - 0.4 + mouseY * 0.8, 0);
+  
+  const nearestIdx = Math.round(progress * (SHARD_COUNT - 1));
+  if (nearestIdx !== lastChimeIdx && nearestIdx >= 0 && nearestIdx < SHARD_COUNT) {
+    lastChimeIdx = nearestIdx;
+    playChime(nearestIdx);
+  }
+  
+  for (const s of shards) {
+    if (s.userData.bg) {
+      s.rotation.y += s.userData.spin;
+      s.rotation.x += s.userData.spin * 0.5;
+    } else {
+      s.rotation.y += s.userData.spinY;
+      s.rotation.x += s.userData.spinX;
+      const p = s.userData.baseScale +
+        Math.sin(t * s.userData.pulseSpeed + s.userData.pulsePhase) * s.userData.pulseAmp;
+      s.scale.setScalar(p);
+      if (s.userData.basePos) {
+        s.position.y = s.userData.basePos.y + Math.sin(t * 0.6 + s.userData.basePos.x) * 0.12;
+      }
+      if (s.userData.inner) {
+        s.userData.inner.rotation.y -= s.userData.inner.userData.spinY;
+        s.userData.inner.rotation.x -= s.userData.inner.userData.spinX;
+        const eIntensity = 1.2 +
+          Math.sin(t * s.userData.pulseSpeed * 1.3 + s.userData.pulsePhase + Math.PI) * 0.6;
+        s.userData.inner.material.emissiveIntensity = eIntensity;
+      }
+      if (s.userData.sprite) {
+        const dy = s.position.y - camera.position.y;
+        const op = Math.max(0, 1 - Math.abs(dy) / 6);
+        s.userData.sprite.material.opacity = op;
+        s.userData.sprite.position.y =
+          s.userData.radius * 1.55 + Math.sin(t * 1.5 + s.userData.pulsePhase) * 0.08;
+      }
+    }
+  }
+  
+  const dp = dust.geometry.attributes.position;
+  for (let i = 0; i < dustCount; i++) {
+    dp.array[i*3+1] -= dustSpeed[i];
+    if (dp.array[i*3+1] < camera.position.y - 35) {
+      dp.array[i*3+1] = camera.position.y + 35;
+      dp.array[i*3] = (Math.random() - 0.5) * 50;
+    }
+  }
+  dp.needsUpdate = true;
+  dust.position.x = mouseX * 0.6;
+  
+  aurora1.position.set(
+    Math.cos(t * 0.35) * 5,
+    camera.position.y + Math.sin(t * 0.5) * 2.5,
+    Math.sin(t * 0.4) * 3
+  );
+  aurora2.position.set(
+    Math.cos(t * 0.35 + Math.PI) * 5,
+    camera.position.y + Math.sin(t * 0.5 + Math.PI) * 2.5,
+    Math.sin(t * 0.4 + Math.PI) * 3
+  );
+  aurora3.position.set(
+    Math.cos(t * 0.22) * 3,
+    camera.position.y + Math.cos(t * 0.3) * 4,
+    -3 + Math.sin(t * 0.5) * 2
+  );
+  
+  updateUI(progress);
+  renderer.render(scene, camera);
+}
+frame();
+</script>
+
+</body>
+</html>
