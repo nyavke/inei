@@ -1,0 +1,869 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>DARK FAERIE — Управление роботом жестами</title>
+<meta name="description" content="Проект команды DARK FAERIE — система управления роботом жестами руки на базе MediaPipe и MQTT.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@200;300;400;500;700&family=Onest:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  /* ============== TOKENS ============== */
+  :root{
+    --void:#0a0c10;
+    --void-2:#0e1117;
+    --ice:#b6bac5;
+    --ice-bright:#dfe4ed;
+    --steel:#383e4e;
+    --steel-deep:#1b1f29;
+    --cyan:#7ed7ea;
+    --aurora-a:#9be7ff;
+    --aurora-b:#c9b3ff;
+    --aurora-c:#7ed7c8;
+    --line:rgba(182,186,197,.12);
+    --line-strong:rgba(182,186,197,.28);
+    --mono:'JetBrains Mono', ui-monospace, monospace;
+    --display:'Unbounded', system-ui, sans-serif;
+    --body:'Onest', system-ui, sans-serif;
+    --pad: clamp(20px, 4vw, 56px);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+  html,body{background:var(--void);color:var(--ice);font-family:var(--body);font-weight:400;line-height:1.5;overflow-x:hidden}
+  body{
+    background:
+      radial-gradient(1200px 800px at 15% -10%, rgba(155,231,255,.08), transparent 60%),
+      radial-gradient(900px 700px at 95% 20%, rgba(201,179,255,.06), transparent 60%),
+      radial-gradient(900px 900px at 50% 110%, rgba(126,215,200,.07), transparent 60%),
+      var(--void);
+  }
+  ::selection{background:var(--aurora-a);color:var(--void)}
+  a{color:inherit;text-decoration:none}
+  img,svg{display:block;max-width:100%}
+
+  /* Grain */
+  body::before{
+    content:'';position:fixed;inset:-50%;pointer-events:none;z-index:100;opacity:.06;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.9'/></svg>");
+  }
+  /* Subtle vignette */
+  body::after{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:99;
+    background:radial-gradient(120% 80% at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%);
+  }
+
+  /* ============== NAV ============== */
+  nav.top{
+    position:fixed;top:0;left:0;right:0;z-index:50;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px var(--pad);
+    background:linear-gradient(to bottom, rgba(10,12,16,.7), rgba(10,12,16,0));
+    backdrop-filter: blur(10px) saturate(120%);
+    -webkit-backdrop-filter: blur(10px) saturate(120%);
+    border-bottom:1px solid var(--line);
+    font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  }
+  nav.top .brand{display:flex;align-items:center;gap:10px;color:var(--ice-bright);font-weight:500}
+  nav.top .brand svg{width:18px;height:18px}
+  nav.top ul{display:flex;gap:24px;list-style:none}
+  nav.top ul a{color:var(--ice);opacity:.7;transition:opacity .25s, color .25s}
+  nav.top ul a:hover{opacity:1;color:#fff}
+  nav.top .right{display:flex;align-items:center;gap:18px;color:var(--ice);opacity:.7}
+  .pulse{width:7px;height:7px;border-radius:50%;background:var(--aurora-c);box-shadow:0 0 0 0 rgba(126,215,200,.7);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(126,215,200,.6)}70%{box-shadow:0 0 0 10px rgba(126,215,200,0)}100%{box-shadow:0 0 0 0 rgba(126,215,200,0)}}
+  @media (max-width:760px){nav.top ul{display:none}}
+
+  /* ============== LAYOUT ============== */
+  section{padding: clamp(80px,12vh,160px) var(--pad);position:relative}
+  .container{max-width:1280px;margin:0 auto}
+  .label{
+    font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--ice);opacity:.55;display:flex;align-items:center;gap:14px;
+  }
+  .label::before{content:'';width:28px;height:1px;background:var(--line-strong)}
+  .num{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--aurora-a);opacity:.8}
+
+  h1,h2,h3{font-family:var(--display);font-weight:300;color:var(--ice-bright);letter-spacing:-.02em;line-height:.95}
+  h1{font-size:clamp(48px,11vw,180px);font-weight:200}
+  h2{font-size:clamp(36px,6.5vw,84px);font-weight:300}
+  h3{font-size:clamp(20px,2vw,28px);font-weight:400;letter-spacing:-.01em;line-height:1.1}
+  p{color:var(--ice);opacity:.78;font-size:clamp(15px,1.1vw,17px);max-width:62ch}
+  .lede{font-size:clamp(17px,1.4vw,22px);color:var(--ice-bright);opacity:.9;line-height:1.45;max-width:60ch}
+
+  /* ============== HERO ============== */
+  .hero{min-height:100vh;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:clamp(60px,8vh,120px);position:relative;overflow:hidden}
+  .hero .container{position:relative;z-index:2;width:100%}
+  .hero-meta{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:clamp(40px,8vh,80px);font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--ice);opacity:.6}
+  .hero-meta > div{display:flex;flex-direction:column;gap:6px}
+  .hero-meta b{font-weight:500;color:var(--ice-bright);opacity:.9;letter-spacing:.18em}
+  .hero h1{position:relative}
+  .hero h1 .stroke{
+    -webkit-text-stroke:1px var(--ice);
+    color:transparent;
+    font-style:italic;font-weight:200;
+  }
+  .hero h1 .grad{
+    background:linear-gradient(120deg, var(--aurora-a) 0%, var(--aurora-c) 40%, var(--aurora-b) 80%, var(--ice-bright));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .hero-sub{margin-top:clamp(28px,4vh,48px);display:grid;grid-template-columns:1fr auto;gap:32px;align-items:end}
+  .hero-sub p{max-width:48ch}
+  .scroll-cue{font-family:var(--mono);font-size:10px;letter-spacing:.3em;text-transform:uppercase;opacity:.5;display:flex;align-items:center;gap:10px}
+  .scroll-cue .dash{width:36px;height:1px;background:var(--ice);position:relative;overflow:hidden}
+  .scroll-cue .dash::after{content:'';position:absolute;inset:0;background:var(--aurora-a);transform:translateX(-100%);animation:trail 2.4s ease-in-out infinite}
+  @keyframes trail{0%{transform:translateX(-100%)}50%{transform:translateX(0)}100%{transform:translateX(100%)}}
+
+  /* Iceberg shape behind hero */
+  .iceberg{position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none}
+  .iceberg .shard{
+    position:absolute;right:-10vw;top:8%;width:70vw;max-width:900px;aspect-ratio:1/1;
+    background:
+      conic-gradient(from 200deg at 50% 50%, rgba(155,231,255,.18), rgba(201,179,255,.10) 30%, transparent 55%, rgba(126,215,200,.15) 80%, rgba(155,231,255,.18));
+    filter:blur(60px);
+    border-radius:50%;
+    opacity:.85;
+    animation:drift 22s ease-in-out infinite alternate;
+  }
+  .iceberg .shard2{
+    position:absolute;left:-10vw;bottom:-20vh;width:50vw;max-width:700px;aspect-ratio:1/1;
+    background:radial-gradient(closest-side, rgba(126,215,200,.18), transparent 70%);
+    filter:blur(40px);
+    animation:drift 18s ease-in-out infinite alternate-reverse;
+  }
+  @keyframes drift{
+    0%{transform:translate(0,0) scale(1)}
+    100%{transform:translate(-40px,30px) scale(1.08)}
+  }
+  .grid-bg{
+    position:absolute;inset:0;z-index:0;pointer-events:none;
+    background-image:
+      linear-gradient(to right, var(--line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+    background-size:80px 80px;
+    mask-image:radial-gradient(ellipse at 50% 50%, black 30%, transparent 75%);
+    -webkit-mask-image:radial-gradient(ellipse at 50% 50%, black 30%, transparent 75%);
+    opacity:.5;
+  }
+
+  /* ============== SECTION HEADER ============== */
+  .sec-head{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:end;margin-bottom:clamp(40px,7vh,80px)}
+  .sec-head .right{justify-self:end;text-align:right;max-width:42ch}
+  @media (max-width:820px){.sec-head{grid-template-columns:1fr}.sec-head .right{justify-self:start;text-align:left}}
+
+  /* ============== CARDS ============== */
+  .card{
+    position:relative;
+    background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.005));
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:clamp(22px,3vw,36px);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    overflow:hidden;
+    transition: border-color .4s ease, transform .4s ease;
+  }
+  .card::before{
+    content:'';position:absolute;inset:0;border-radius:18px;padding:1px;
+    background:linear-gradient(135deg, rgba(155,231,255,.0), rgba(155,231,255,.3), rgba(201,179,255,.0));
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude;
+    opacity:0;transition:opacity .5s ease;
+    pointer-events:none;
+  }
+  .card:hover::before{opacity:1}
+  .card:hover{border-color:var(--line-strong);transform:translateY(-2px)}
+
+  /* ============== SECTION 01 : TEAM NAME ============== */
+  .team-block{display:grid;grid-template-columns:1.2fr .8fr;gap:48px;align-items:center}
+  @media (max-width:920px){.team-block{grid-template-columns:1fr}}
+  .team-name{font-family:var(--display);font-weight:200;font-size:clamp(56px,11vw,180px);line-height:.85;letter-spacing:-.04em;color:var(--ice-bright)}
+  .team-name span{display:block}
+  .team-name .lo{
+    -webkit-text-stroke:1px var(--cyan);color:transparent;font-style:italic;
+    background:linear-gradient(120deg, var(--aurora-a), var(--aurora-b));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+    -webkit-text-stroke:0;
+  }
+  .crest{
+    aspect-ratio:1/1;width:100%;max-width:340px;justify-self:end;
+    border-radius:50%;
+    background:
+      radial-gradient(circle at 30% 30%, rgba(155,231,255,.35), transparent 50%),
+      conic-gradient(from 45deg, rgba(126,215,200,.3), rgba(201,179,255,.3), rgba(155,231,255,.4), rgba(126,215,200,.3));
+    border:1px solid var(--line-strong);
+    position:relative;
+    animation:rotate 30s linear infinite;
+    box-shadow:0 0 80px rgba(155,231,255,.15) inset, 0 30px 60px rgba(0,0,0,.4);
+  }
+  .crest::before{
+    content:'';position:absolute;inset:14%;border-radius:50%;
+    background:var(--void-2);
+    border:1px solid var(--line);
+  }
+  .crest::after{
+    content:'※';position:absolute;inset:0;display:grid;place-items:center;
+    font-family:var(--display);font-size:clamp(40px,5vw,72px);color:var(--ice-bright);
+    animation:rotate 30s linear infinite reverse;
+  }
+  @keyframes rotate{to{transform:rotate(360deg)}}
+  .team-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+  .tag{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;padding:6px 12px;border:1px solid var(--line-strong);border-radius:99px;color:var(--ice);opacity:.8}
+
+  /* ============== SECTION 02 : INTRO ============== */
+  .intro-grid{display:grid;grid-template-columns:340px 1fr;gap:clamp(32px,5vw,72px);align-items:start}
+  @media (max-width:820px){.intro-grid{grid-template-columns:1fr}}
+  .portrait{
+    aspect-ratio:3/4;border-radius:14px;
+    background:
+      radial-gradient(circle at 60% 30%, rgba(155,231,255,.4), transparent 55%),
+      linear-gradient(160deg, var(--steel) 0%, var(--steel-deep) 50%, var(--void-2) 100%);
+    border:1px solid var(--line-strong);
+    position:relative;overflow:hidden;
+  }
+  .portrait .figure{
+    position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:74%;height:84%;
+  }
+  .portrait .figure circle{fill:var(--ice-bright);opacity:.95}
+  .portrait .figure path{fill:var(--ice-bright);opacity:.9}
+  .portrait .badge{
+    position:absolute;top:14px;left:14px;font-family:var(--mono);font-size:9px;letter-spacing:.25em;text-transform:uppercase;color:var(--ice);opacity:.7;
+    border:1px solid var(--line-strong);padding:5px 9px;border-radius:99px;background:rgba(10,12,16,.5);
+  }
+  .portrait .id{
+    position:absolute;bottom:14px;left:14px;right:14px;font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ice);opacity:.8;display:flex;justify-content:space-between
+  }
+  .bio-rows{display:flex;flex-direction:column;gap:0;margin-top:32px}
+  .bio-rows .row{display:grid;grid-template-columns:160px 1fr;gap:24px;padding:18px 0;border-top:1px solid var(--line)}
+  .bio-rows .row:last-child{border-bottom:1px solid var(--line)}
+  .bio-rows .row dt{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--ice);opacity:.55}
+  .bio-rows .row dd{color:var(--ice-bright);font-size:15px}
+  @media (max-width:560px){.bio-rows .row{grid-template-columns:1fr;gap:4px}}
+
+  /* ============== SECTION 03 : PROJECT NAME ============== */
+  .project-name{
+    font-family:var(--display);font-weight:200;font-size:clamp(48px,9vw,140px);line-height:.92;letter-spacing:-.03em;
+  }
+  .project-name .a{color:var(--ice-bright)}
+  .project-name .b{
+    background:linear-gradient(120deg, var(--aurora-a), var(--aurora-c), var(--aurora-b));
+    -webkit-background-clip:text;background-clip:text;color:transparent;font-style:italic;font-weight:300;
+  }
+  .project-meta{
+    margin-top:48px;display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)
+  }
+  .project-meta > div{padding:22px 24px;border-right:1px solid var(--line)}
+  .project-meta > div:last-child{border-right:none}
+  .project-meta .k{font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--ice);opacity:.55;margin-bottom:8px}
+  .project-meta .v{font-family:var(--display);font-weight:300;font-size:22px;color:var(--ice-bright)}
+  @media (max-width:820px){.project-meta{grid-template-columns:repeat(2,1fr)}.project-meta > div{border-bottom:1px solid var(--line)}.project-meta > div:nth-child(odd){border-right:1px solid var(--line)}.project-meta > div:nth-child(even){border-right:none}}
+
+  /* ============== SECTION 04 : WHY ============== */
+  .why-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:24px}
+  @media (max-width:980px){.why-grid{grid-template-columns:1fr 1fr}}
+  @media (max-width:600px){.why-grid{grid-template-columns:1fr}}
+  .why .card{min-height:280px;display:flex;flex-direction:column;justify-content:space-between;gap:32px}
+  .why .icon{width:64px;height:64px;border-radius:14px;display:grid;place-items:center;
+    background:linear-gradient(135deg, rgba(155,231,255,.12), rgba(201,179,255,.06));
+    border:1px solid var(--line-strong);
+    color:var(--aurora-a);
+  }
+  .why h3{font-family:var(--display);font-weight:300;font-size:24px;color:var(--ice-bright);margin-bottom:10px}
+  .why p{font-size:14px;opacity:.7;line-height:1.55}
+  .why .card .num-tag{position:absolute;top:18px;right:22px;font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--ice);opacity:.5}
+
+  /* ============== SECTION 05 : CONSTRUCTION ============== */
+  .pipeline{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin-top:24px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0))}
+  .pipeline > div{padding:32px 24px;border-right:1px solid var(--line);position:relative;display:flex;flex-direction:column;gap:14px;min-height:240px}
+  .pipeline > div:last-child{border-right:none}
+  .pipeline .n{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--aurora-a)}
+  .pipeline .ttl{font-family:var(--display);font-weight:400;font-size:18px;color:var(--ice-bright);line-height:1.15;letter-spacing:-.01em}
+  .pipeline .desc{font-size:13px;color:var(--ice);opacity:.7;margin-top:auto;line-height:1.5}
+  .pipeline .ic{height:48px;display:flex;align-items:center;color:var(--ice-bright);opacity:.85}
+  .pipeline > div::after{
+    content:'→';position:absolute;right:-9px;top:50%;transform:translateY(-50%);
+    width:18px;height:18px;display:grid;place-items:center;
+    background:var(--void);color:var(--aurora-a);font-family:var(--mono);font-size:14px;
+  }
+  .pipeline > div:last-child::after{display:none}
+  @media (max-width:980px){
+    .pipeline{grid-template-columns:1fr 1fr}
+    .pipeline > div{border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .pipeline > div:nth-child(2n){border-right:none}
+    .pipeline > div::after{display:none}
+  }
+  @media (max-width:560px){.pipeline{grid-template-columns:1fr}.pipeline > div{border-right:none !important}}
+
+  .specs{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:24px}
+  @media (max-width:820px){.specs{grid-template-columns:repeat(2,1fr)}}
+  .spec{padding:20px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.015)}
+  .spec .k{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--ice);opacity:.55;text-transform:uppercase}
+  .spec .v{font-family:var(--display);font-weight:300;font-size:clamp(22px,2.4vw,32px);color:var(--ice-bright);margin-top:8px;letter-spacing:-.02em;line-height:1}
+  .spec .u{font-family:var(--mono);font-size:11px;color:var(--ice);opacity:.6;margin-left:4px}
+
+  /* ============== SECTION 06 : PROGRAM ============== */
+  .program-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px}
+  @media (max-width:980px){.program-grid{grid-template-columns:1fr}}
+  .gestures{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:24px}
+  @media (max-width:820px){.gestures{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:480px){.gestures{grid-template-columns:1fr 1fr}}
+  .gesture{
+    padding:20px 16px;border:1px solid var(--line);border-radius:14px;
+    background:rgba(255,255,255,.015);
+    display:flex;flex-direction:column;gap:14px;align-items:flex-start;
+    transition:border-color .4s, background .4s;
+    position:relative;overflow:hidden;
+  }
+  .gesture:hover{border-color:var(--cyan);background:rgba(155,231,255,.04)}
+  .gesture .hand{height:80px;width:100%;display:grid;place-items:center;color:var(--ice-bright)}
+  .gesture .cmd{font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--aurora-a)}
+  .gesture .name{font-family:var(--display);font-weight:300;font-size:20px;color:var(--ice-bright)}
+  .gesture .ru{font-size:12px;color:var(--ice);opacity:.65}
+
+  /* Code block */
+  .code-card{
+    border:1px solid var(--line);border-radius:14px;overflow:hidden;
+    background:linear-gradient(180deg, rgba(155,231,255,.03), rgba(0,0,0,.2));
+  }
+  .code-head{
+    display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line);
+    font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ice);opacity:.8;
+  }
+  .code-head .dots{display:flex;gap:6px}
+  .code-head .dots span{width:8px;height:8px;border-radius:50%;background:var(--line-strong)}
+  .code-head .dots span:nth-child(1){background:#ff7a7a;opacity:.6}
+  .code-head .dots span:nth-child(2){background:#ffcc66;opacity:.6}
+  .code-head .dots span:nth-child(3){background:var(--aurora-c);opacity:.7}
+  pre{
+    margin:0;padding:22px 24px;font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--ice);overflow-x:auto;
+  }
+  pre .kw{color:#c9b3ff}
+  pre .fn{color:#9be7ff}
+  pre .str{color:#7ed7c8}
+  pre .num{color:#ffbf80}
+  pre .com{color:var(--ice);opacity:.4;font-style:italic}
+  pre .var{color:var(--ice-bright)}
+
+  .steps{display:flex;flex-direction:column;margin-top:24px;border-top:1px solid var(--line)}
+  .step{display:grid;grid-template-columns:90px 1fr;gap:24px;padding:22px 0;border-bottom:1px solid var(--line);align-items:start}
+  .step .n{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--aurora-a)}
+  .step h4{font-family:var(--display);font-weight:300;font-size:20px;color:var(--ice-bright);margin-bottom:6px;letter-spacing:-.01em}
+  .step p{font-size:14px;opacity:.72}
+  @media (max-width:560px){.step{grid-template-columns:1fr;gap:8px}}
+
+  /* ============== FOOTER ============== */
+  footer{padding:80px var(--pad) 40px;border-top:1px solid var(--line);position:relative;overflow:hidden}
+  .marquee{display:flex;gap:48px;font-family:var(--display);font-weight:200;font-size:clamp(48px,10vw,140px);letter-spacing:-.03em;line-height:1;color:var(--ice-bright);opacity:.85;white-space:nowrap;animation:marquee 28s linear infinite}
+  .marquee span{display:inline-block}
+  .marquee .stroke{-webkit-text-stroke:1px var(--cyan);color:transparent;font-style:italic}
+  @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  .marquee-wrap{overflow:hidden;mask-image:linear-gradient(90deg, transparent, black 8%, black 92%, transparent);-webkit-mask-image:linear-gradient(90deg, transparent, black 8%, black 92%, transparent)}
+  .foot-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:24px;margin-top:64px;padding-top:32px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ice);opacity:.7}
+  .foot-grid h5{font-family:var(--mono);font-weight:500;color:var(--ice-bright);opacity:.9;margin-bottom:12px;font-size:10px}
+  .foot-grid p, .foot-grid a{display:block;font-size:11px;color:var(--ice);opacity:.7;margin-bottom:6px}
+  @media (max-width:760px){.foot-grid{grid-template-columns:1fr 1fr}}
+
+  /* ============== ANIMATIONS / REVEAL ============== */
+  .reveal{opacity:0;transform:translateY(20px);transition:opacity .9s ease, transform .9s ease}
+  .reveal.in{opacity:1;transform:translateY(0)}
+  .reveal[data-d="1"]{transition-delay:.05s}
+  .reveal[data-d="2"]{transition-delay:.15s}
+  .reveal[data-d="3"]{transition-delay:.25s}
+  .reveal[data-d="4"]{transition-delay:.35s}
+  .reveal[data-d="5"]{transition-delay:.45s}
+
+  /* Hand SVG glow on hover */
+  .gesture .hand svg{transition:filter .4s ease}
+  .gesture:hover .hand svg{filter:drop-shadow(0 0 18px rgba(155,231,255,.4))}
+
+</style>
+</head>
+<body>
+
+<!-- ============== NAV ============== -->
+<nav class="top">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 L22 20 L2 20 Z"/><path d="M12 2 L12 20"/></svg>
+    DARK&nbsp;FAERIE
+  </div>
+  <ul>
+    <li><a href="#s1">01 / Команда</a></li>
+    <li><a href="#s2">02 / Автор</a></li>
+    <li><a href="#s3">03 / Проект</a></li>
+    <li><a href="#s4">04 / Назначение</a></li>
+    <li><a href="#s5">05 / Конструкция</a></li>
+    <li><a href="#s6">06 / Программа</a></li>
+  </ul>
+  <div class="right">
+    <span class="pulse"></span>
+    <span>MQTT&nbsp;LIVE</span>
+  </div>
+</nav>
+
+<!-- ============== HERO ============== -->
+<header class="hero">
+  <div class="grid-bg"></div>
+  <div class="iceberg">
+    <div class="shard"></div>
+    <div class="shard2"></div>
+  </div>
+  <div class="container">
+    <div class="hero-meta reveal in">
+      <div><span>Команда</span><b>DARK FAERIE</b></div>
+      <div><span>Школа</span><b>LIGA РОБОТОВ</b></div>
+      <div><span>Год</span><b>2026 / V0.1</b></div>
+      <div><span>Стек</span><b>MEDIAPIPE · MQTT · PYTHON</b></div>
+    </div>
+    <h1 class="reveal in" data-d="1">
+      <span class="grad">Жесты</span><br>
+      <span class="stroke">управляют</span><br>
+      <span>роботом.</span>
+    </h1>
+    <div class="hero-sub reveal in" data-d="3">
+      <p class="lede">Система распознаёт пять жестов руки в реальном времени и мгновенно передаёт команды роботу через MQTT&nbsp;— без проводов, контроллеров и пультов.</p>
+      <div class="scroll-cue"><span class="dash"></span><span>Прокрутите вниз</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============== 01 : TEAM NAME ============== -->
+<section id="s1">
+  <div class="container">
+    <div class="sec-head reveal">
+      <div>
+        <div class="label"><span class="num">01</span>&nbsp;&nbsp;НАЗВАНИЕ КОМАНДЫ</div>
+        <h2 style="margin-top:18px">Кто стоит за этим проектом.</h2>
+      </div>
+      <div class="right">
+        <p>Имя команды отражает то, как ощущается работа со скрытыми сигналами&nbsp;— чем-то невидимым, но точно реагирующим на движение руки.</p>
+      </div>
+    </div>
+
+    <div class="team-block reveal">
+      <div>
+        <div class="team-name">
+          <span>DARK</span>
+          <span class="lo">faerie</span>
+        </div>
+        <div class="team-tags">
+          <span class="tag">ligarobotov / darkfaerie</span>
+          <span class="tag">соло-команда</span>
+          <span class="tag">computer vision</span>
+          <span class="tag">iot</span>
+        </div>
+      </div>
+      <div class="crest" aria-hidden="true"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== 02 : INTRODUCE ============== -->
+<section id="s2">
+  <div class="container">
+    <div class="sec-head reveal">
+      <div>
+        <div class="label"><span class="num">02</span>&nbsp;&nbsp;ПРЕДСТАВЛЯЕМСЯ</div>
+        <h2 style="margin-top:18px">Автор проекта.</h2>
+      </div>
+      <div class="right">
+        <p>Проект разработан и собран одним человеком&nbsp;— от модели распознавания до прошивки робота и презентации.</p>
+      </div>
+    </div>
+
+    <div class="intro-grid reveal">
+      <div class="portrait">
+        <span class="badge">● rec / 17.05.2026</span>
+        <svg class="figure" viewBox="0 0 200 240" aria-hidden="true">
+          <circle cx="100" cy="70" r="44"/>
+          <path d="M30 240 C30 165, 70 130, 100 130 C130 130, 170 165, 170 240 Z"/>
+        </svg>
+        <div class="id"><span>ID&nbsp;/&nbsp;DF-01</span><span>VLAD&nbsp;M.</span></div>
+      </div>
+      <div>
+        <h3 style="font-size:clamp(28px,3.4vw,44px);font-weight:300;line-height:1.05;letter-spacing:-.02em">Мазиков Владимир Артемович</h3>
+        <p style="margin-top:16px;max-width:54ch">Ученик международной школы робототехники и программирования LIGA. Занимаюсь Python, компьютерным зрением и IoT&nbsp;— люблю задачи, где код встречается с физическим миром.</p>
+        <dl class="bio-rows">
+          <div class="row"><dt>Роль</dt><dd>Разработчик · Сборщик · Презентующий</dd></div>
+          <div class="row"><dt>Стек</dt><dd>Python · OpenCV · MediaPipe · MQTT · Google Colab</dd></div>
+          <div class="row"><dt>Школа</dt><dd>LIGA РОБОТОВ — международная школа робототехники и программирования</dd></div>
+          <div class="row"><dt>Кейс</dt><dd>Управление роботом жестами на базе нейросетевого детектора руки</dd></div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== 03 : PROJECT NAME ============== -->
+<section id="s3">
+  <div class="container">
+    <div class="sec-head reveal">
+      <div>
+        <div class="label"><span class="num">03</span>&nbsp;&nbsp;НАЗВАНИЕ ПРОЕКТА</div>
+      </div>
+      <div class="right">
+        <p>Короткое рабочее имя для системы и протокола команд, который она генерирует.</p>
+      </div>
+    </div>
+
+    <div class="reveal">
+      <div class="project-name">
+        <span class="a">Управление роботом —</span>
+        <span class="b">жестами руки.</span>
+      </div>
+      <div class="project-meta">
+        <div><div class="k">Кодовое имя</div><div class="v">GESTURE&nbsp;LINK</div></div>
+        <div><div class="k">Тип</div><div class="v">CV&nbsp;+&nbsp;IoT</div></div>
+        <div><div class="k">Команд</div><div class="v">5&nbsp;жестов</div></div>
+        <div><div class="k">Канал</div><div class="v">MQTT</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== 04 : WHY ============== -->
+<section id="s4" class="why">
+  <div class="container">
+    <div class="sec-head reveal">
+      <div>
+        <div class="label"><span class="num">04</span>&nbsp;&nbsp;ЗАЧЕМ ОН НУЖЕН</div>
+        <h2 style="margin-top:18px">Кому и как может помочь.</h2>
+      </div>
+      <div class="right">
+        <p>Жесты&nbsp;— один из самых естественных способов общаться с машиной. Никаких пультов, проводов и кнопок&nbsp;— достаточно показать руку.</p>
+      </div>
+    </div>
+
+    <div class="why-grid reveal">
+      <div class="card">
+        <span class="num-tag">01</span>
+        <div class="icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 21c0-4 3-7 7-7s7 3 7 7"/></svg>
+        </div>
+        <div>
+          <h3>Люди с ограниченными возможностями</h3>
+          <p>Управление помогающим роботом или коляской без необходимости держать пульт и нажимать мелкие кнопки&nbsp;— достаточно показать руку перед камерой.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="num-tag">02</span>
+        <div class="icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3l2-7 4 14 2-7 2 4h5"/></svg>
+        </div>
+        <div>
+          <h3>Медицина и стерильные зоны</h3>
+          <p>Хирург или лаборант может управлять приборами и роботизированными ассистентами, не прикасаясь к ним руками&nbsp;— это сохраняет стерильность.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="num-tag">03</span>
+        <div class="icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 12h8M12 8v8"/></svg>
+        </div>
+        <div>
+          <h3>Образование</h3>
+          <p>Наглядный кейс «нейросеть&nbsp;→ код&nbsp;→ железо» для уроков робототехники: показывает, как Python, ML и IoT работают вместе.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="num-tag">04</span>
+        <div class="icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l5-5 4 4 7-9"/><path d="M14 7h6v6"/></svg>
+        </div>
+        <div>
+          <h3>Промышленность</h3>
+          <p>На производстве оператор может управлять манипулятором или конвейером с расстояния, не отрываясь от ручной работы и не снимая перчаток.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="num-tag">05</span>
+        <div class="icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg>
+        </div>
+        <div>
+          <h3>Дом и быт</h3>
+          <p>Управление умной техникой и игрушками без поиска пульта или телефона&nbsp;— жест перед камерой запускает нужный сценарий.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="num-tag">06</span>
+        <div class="icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        </div>
+        <div>
+          <h3>Игры и развлечения</h3>
+          <p>Бесконтактный контроллер для роботов-питомцев, гонок и интерактивных игр&nbsp;— рука превращается в джойстик.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== 05 : CONSTRUCTION ============== -->
+<section id="s5">
+  <div class="container">
+    <div class="sec-head reveal">
+      <div>
+        <div class="label"><span class="num">05</span>&nbsp;&nbsp;ЧТО ПРЕДСТАВЛЯЕТ СОБОЙ КОНСТРУКЦИЯ</div>
+        <h2 style="margin-top:18px">Архитектура системы.</h2>
+      </div>
+      <div class="right">
+        <p>Пять связанных звеньев&nbsp;— от живого видео с камеры до движения колёс робота. Каждый шаг работает в реальном времени.</p>
+      </div>
+    </div>
+
+    <div class="pipeline reveal">
+      <div>
+        <span class="n">01 / ВХОД</span>
+        <div class="ic">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="7" width="14" height="10" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg>
+        </div>
+        <div class="ttl">Веб-камера</div>
+        <div class="desc">Захват видео 640×480 в браузере, ~12 FPS, передача каждого кадра в Python.</div>
+      </div>
+      <div>
+        <span class="n">02 / МОЗГ</span>
+        <div class="ic">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8 V6 a2 2 0 0 1 2-2 h2 a2 2 0 0 1 2 2 v12 a2 2 0 0 1-2 2 h-2 a2 2 0 0 1-2-2 v-2"/><path d="M19 8 V6 a2 2 0 0 0-2-2 h-2 a2 2 0 0 0-2 2 v12 a2 2 0 0 0 2 2 h2 a2 2 0 0 0 2-2 v-2"/><path d="M5 12h14"/></svg>
+        </div>
+        <div class="ttl">MediaPipe Hands</div>
+        <div class="desc">21 ключевая точка руки. Определяет, какие пальцы подняты, с точностью &gt;70%.</div>
+      </div>
+      <div>
+        <span class="n">03 / ЛОГИКА</span>
+        <div class="ic">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 6 10 4 14 4 16 6 20 6"/><polyline points="4 18 8 18 10 20 14 20 16 18 20 18"/><path d="M4 12h16"/></svg>
+        </div>
+        <div class="ttl">Классификатор</div>
+        <div class="desc">Считает поднятые пальцы и присваивает жесту команду: stop / forward / back / left / right.</div>
+      </div>
+      <div>
+        <span class="n">04 / КАНАЛ</span>
+        <div class="ic">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18a14 14 0 0 1 14-14"/><path d="M4 13a9 9 0 0 1 9-9"/><path d="M4 8a4 4 0 0 1 4-4"/><circle cx="5" cy="19" r="1.4" fill="currentColor"/></svg>
+        </div>
+        <div class="ttl">MQTT broker</div>
+        <div class="desc">broker.emqx.io, топик <code style="font-family:var(--mono);color:var(--aurora-a)">ligarobotov/darkfaerie</code>.</div>
+      </div>
+      <div>
+        <span class="n">05 / ВЫХОД</span>
+        <div class="ic">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="9" rx="2"/><circle cx="9" cy="19" r="2"/><circle cx="15" cy="19" r="2"/><path d="M10 6V4M14 6V4"/></svg>
+        </div>
+        <div class="ttl">Робот</div>
+        <div class="desc">Получает команду, исполняет движение: едет, поворачивает, останавливается.</div>
+      </div>
+    </div>
+
+    <div class="specs reveal" style="margin-top:36px">
+      <div class="spec"><div class="k">Распознавание</div><div class="v">21<span class="u">точка</span></div></div>
+      <div class="spec"><div class="k">Жестов</div><div class="v">5<span class="u">команд</span></div></div>
+      <div class="spec"><div class="k">Частота</div><div class="v">12<span class="u">FPS</span></div></div>
+      <div class="spec"><div class="k">Стабилизация</div><div class="v">5<span class="u">кадров</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== 06 : PROGRAM ============== -->
+<section id="s6">
+  <div class="container">
+    <div class="sec-head reveal">
+      <div>
+        <div class="label"><span class="num">06</span>&nbsp;&nbsp;ОПИШИТЕ ПРОГРАММУ</div>
+        <h2 style="margin-top:18px">Как это работает.</h2>
+      </div>
+      <div class="right">
+        <p>Код написан на Python и запускается в Google Colab. Использует MediaPipe для распознавания, OpenCV для обработки кадров и paho-mqtt для передачи команд роботу.</p>
+      </div>
+    </div>
+
+    <!-- Жесты -->
+    <h3 style="font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--ice);opacity:.6;font-weight:400">— Карта жестов</h3>
+    <div class="gestures reveal">
+      <div class="gesture">
+        <div class="hand">
+          <svg width="68" height="80" viewBox="0 0 60 80" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 78 V40 a4 4 0 0 1 8 0 V18 a4 4 0 0 1 8 0 V18 a4 4 0 0 1 8 0 V22 a4 4 0 0 1 8 0 V40"/>
+            <path d="M10 50 a6 6 0 0 1 6-6"/>
+          </svg>
+        </div>
+        <div class="cmd">stop</div>
+        <div class="name">Открытая ладонь</div>
+        <div class="ru">Четыре пальца вверх&nbsp;— стоп.</div>
+      </div>
+      <div class="gesture">
+        <div class="hand">
+          <svg width="68" height="80" viewBox="0 0 60 80" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 78 V44 a8 8 0 0 1 16 0 V20 a4 4 0 0 1 8 0 V44 a8 8 0 0 1 -8 8"/>
+          </svg>
+        </div>
+        <div class="cmd">forward</div>
+        <div class="name">Указательный</div>
+        <div class="ru">Один палец вверх&nbsp;— вперёд.</div>
+      </div>
+      <div class="gesture">
+        <div class="hand">
+          <svg width="68" height="80" viewBox="0 0 60 80" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 78 V40 a4 4 0 0 1 8 0 V18 a4 4 0 0 1 8 0 V18 a4 4 0 0 1 8 0 V44"/>
+          </svg>
+        </div>
+        <div class="cmd">right</div>
+        <div class="name">Два пальца</div>
+        <div class="ru">Указательный + средний&nbsp;— вправо.</div>
+      </div>
+      <div class="gesture">
+        <div class="hand">
+          <svg width="68" height="80" viewBox="0 0 60 80" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 78 V40 a4 4 0 0 1 8 0 V18 a4 4 0 0 1 8 0 V18 a4 4 0 0 1 8 0 V18 a4 4 0 0 1 8 0 V42"/>
+          </svg>
+        </div>
+        <div class="cmd">left</div>
+        <div class="name">Три пальца</div>
+        <div class="ru">Указательный, средний, безымянный&nbsp;— влево.</div>
+      </div>
+      <div class="gesture">
+        <div class="hand">
+          <svg width="68" height="80" viewBox="0 0 60 80" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 78 V52 a14 14 0 0 1 14 -14 h6 a6 6 0 0 0 0 -12 h-2 a14 14 0 0 0 -14 14 V52"/>
+          </svg>
+        </div>
+        <div class="cmd">back</div>
+        <div class="name">Кулак</div>
+        <div class="ru">Все пальцы согнуты&nbsp;— назад.</div>
+      </div>
+    </div>
+
+    <!-- Код -->
+    <div class="program-grid reveal" style="margin-top:48px">
+      <div class="code-card">
+        <div class="code-head">
+          <span>gesture_classifier.py</span>
+          <div class="dots"><span></span><span></span><span></span></div>
+        </div>
+<pre><span class="com"># Считаем поднятые пальцы и сопоставляем жест с командой</span>
+<span class="kw">def</span> <span class="fn">recognize_gesture</span>(landmarks):
+    <span class="kw">def</span> <span class="fn">is_extended</span>(tip, pip):
+        <span class="kw">return</span> landmarks[tip].y &lt; landmarks[pip].y
+
+    fingers = [
+        <span class="fn">is_extended</span>(<span class="num">8</span>,  <span class="num">6</span>),   <span class="com"># указательный</span>
+        <span class="fn">is_extended</span>(<span class="num">12</span>, <span class="num">10</span>),  <span class="com"># средний</span>
+        <span class="fn">is_extended</span>(<span class="num">16</span>, <span class="num">14</span>),  <span class="com"># безымянный</span>
+        <span class="fn">is_extended</span>(<span class="num">20</span>, <span class="num">18</span>),  <span class="com"># мизинец</span>
+    ]
+    count = <span class="fn">sum</span>(fingers)
+
+    <span class="kw">if</span>   count == <span class="num">4</span>: <span class="kw">return</span> <span class="str">"stop"</span>
+    <span class="kw">elif</span> count == <span class="num">0</span>: <span class="kw">return</span> <span class="str">"back"</span>
+    <span class="kw">elif</span> count == <span class="num">1</span> <span class="kw">and</span> fingers[<span class="num">0</span>]: <span class="kw">return</span> <span class="str">"forward"</span>
+    <span class="kw">elif</span> count == <span class="num">2</span> <span class="kw">and</span> fingers[<span class="num">0</span>] <span class="kw">and</span> fingers[<span class="num">1</span>]: <span class="kw">return</span> <span class="str">"right"</span>
+    <span class="kw">elif</span> count == <span class="num">3</span> <span class="kw">and</span> fingers[<span class="num">0</span>] <span class="kw">and</span> fingers[<span class="num">1</span>] <span class="kw">and</span> fingers[<span class="num">2</span>]:
+        <span class="kw">return</span> <span class="str">"left"</span>
+    <span class="kw">return</span> <span class="str">"none"</span></pre>
+      </div>
+
+      <div class="code-card">
+        <div class="code-head">
+          <span>main_loop.py</span>
+          <div class="dots"><span></span><span></span><span></span></div>
+        </div>
+<pre><span class="com"># Стабилизация жеста и публикация в MQTT</span>
+<span class="kw">while</span> <span class="kw">True</span>:
+    img = <span class="fn">js2img</span>(<span class="fn">get_frame</span>(label, mask))
+    results = hands.<span class="fn">process</span>(<span class="fn">cv2.cvtColor</span>(img, cv2.COLOR_BGR2RGB))
+
+    current = <span class="str">"none"</span>
+    <span class="kw">if</span> results.multi_hand_landmarks:
+        lm = results.multi_hand_landmarks[<span class="num">0</span>].landmark
+        current = <span class="fn">recognize_gesture</span>(lm)
+        mp_drawing.<span class="fn">draw_landmarks</span>(img, ..., HAND_CONNECTIONS)
+
+    history.<span class="fn">append</span>(current)
+    <span class="kw">if</span> <span class="fn">len</span>(history) &gt; <span class="num">5</span>: history.<span class="fn">pop</span>(<span class="num">0</span>)
+
+    <span class="com"># Подтверждаем команду только если она повторилась 5 кадров подряд</span>
+    stable = <span class="fn">max</span>(<span class="fn">set</span>(history), key=history.count)
+    <span class="kw">if</span> stable != <span class="str">"none"</span> <span class="kw">and</span> stable != last:
+        client.<span class="fn">publish</span>(TOPIC, stable)
+        last = stable</pre>
+      </div>
+    </div>
+
+    <!-- Steps -->
+    <h3 style="font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--ice);opacity:.6;font-weight:400;margin-top:64px">— Алгоритм по шагам</h3>
+    <div class="steps reveal">
+      <div class="step"><span class="n">→ 01</span><div><h4>Захват кадра</h4><p>JavaScript внутри Colab запрашивает камеру браузера и каждые ~80 мс отдаёт кадр 640×480 в Python в виде base64.</p></div></div>
+      <div class="step"><span class="n">→ 02</span><div><h4>Детекция руки</h4><p>MediaPipe Hands находит руку на кадре и возвращает координаты 21 ключевой точки&nbsp;— основания и фаланг пальцев.</p></div></div>
+      <div class="step"><span class="n">→ 03</span><div><h4>Классификация</h4><p>Простая логика: палец считается «поднятым», если его кончик выше среднего сустава. По числу и комбинации поднятых пальцев определяется жест.</p></div></div>
+      <div class="step"><span class="n">→ 04</span><div><h4>Стабилизация</h4><p>Команда отправляется, только если один и тот же жест зафиксирован 5 кадров подряд. Это убирает дрожание и ложные срабатывания.</p></div></div>
+      <div class="step"><span class="n">→ 05</span><div><h4>Публикация в MQTT</h4><p>Клиент paho-mqtt подключается к broker.emqx.io и публикует строку команды в топик <code style="font-family:var(--mono);color:var(--aurora-a)">ligarobotov/darkfaerie</code>.</p></div></div>
+      <div class="step"><span class="n">→ 06</span><div><h4>Исполнение</h4><p>Робот подписан на тот же топик. Получив команду, он сразу выполняет движение&nbsp;— вперёд, назад, влево, вправо или стоп.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== FOOTER ============== -->
+<footer>
+  <div class="marquee-wrap">
+    <div class="marquee">
+      <span>DARK&nbsp;FAERIE</span>
+      <span class="stroke">gesture&nbsp;link</span>
+      <span>※</span>
+      <span>2026</span>
+      <span class="stroke">liga&nbsp;роботов</span>
+      <span>DARK&nbsp;FAERIE</span>
+      <span class="stroke">gesture&nbsp;link</span>
+      <span>※</span>
+      <span>2026</span>
+      <span class="stroke">liga&nbsp;роботов</span>
+    </div>
+  </div>
+  <div class="container foot-grid">
+    <div>
+      <h5>Команда</h5>
+      <p>DARK FAERIE</p>
+      <p>ligarobotov / darkfaerie</p>
+    </div>
+    <div>
+      <h5>Автор</h5>
+      <p>Мазиков В. А.</p>
+      <p>LIGA РОБОТОВ</p>
+    </div>
+    <div>
+      <h5>Стек</h5>
+      <p>Python · OpenCV</p>
+      <p>MediaPipe · MQTT</p>
+    </div>
+    <div>
+      <h5>Презентация</h5>
+      <p>17.05.2026 · 15:10</p>
+      <p>slide 31 / 36</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // IntersectionObserver reveal
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);}
+    });
+  },{threshold:0.12, rootMargin:'0px 0px -50px 0px'});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+  // Smooth anchor
+  document.querySelectorAll('a[href^="#"]').forEach(a=>{
+    a.addEventListener('click', (e)=>{
+      const id = a.getAttribute('href');
+      if(id.length>1){
+        const t = document.querySelector(id);
+        if(t){e.preventDefault();t.scrollIntoView({behavior:'smooth',block:'start'});}
+      }
+    });
+  });
+</script>
+</body>
+</html>
