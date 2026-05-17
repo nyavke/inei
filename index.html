@@ -575,8 +575,22 @@
     pointer-events: none;
   }
   #secret.in .secret-back { opacity: 1; }
-  
-@media (max-width: 720px) {
+
+  /* ===================================================================
+     LANGUAGE SWITCHER
+     =================================================================== */
+  .lang-switcher { display: flex; align-items: center; gap: 5px; }
+  .lang-btn {
+    background: transparent; border: none; color: inherit;
+    font-family: inherit; font-size: 10px; letter-spacing: 0.22em;
+    cursor: pointer; opacity: 0.3; transition: opacity 0.3s; padding: 2px 0;
+    pointer-events: auto;
+  }
+  .lang-btn.active { opacity: 1; }
+  .lang-btn:hover  { opacity: 0.65; }
+  .lang-sep        { opacity: 0.2; font-size: 10px; }
+
+  @media (max-width: 720px) {
     .outro-inner { grid-template-columns: 1fr; gap: 36px; }
     .progress-wrap { right: 14px; }
     .progress-track { height: 140px; }
@@ -619,6 +633,11 @@
     <span>Объекты</span>
     <span>Студия</span>
     <button id="sound-btn"><span class="dot"></span><span id="sound-label">Звук · Выкл</span></button>
+    <div class="lang-switcher">
+      <button id="lang-ru" class="lang-btn active">RU</button>
+      <span class="lang-sep">/</span>
+      <button id="lang-en" class="lang-btn">EN</button>
+    </div>
   </div>
 </nav>
 
@@ -1305,118 +1324,6 @@ setInterval(() => {
 }, 60);
 
 // ===================================================================
-//                            UI UPDATES
-// ===================================================================
-const captions = document.querySelectorAll('.caption');
-const progressBar = document.getElementById('progress-bar');
-const hudDepth = document.getElementById('hud-depth');
-const hudLat = document.getElementById('hud-lat');
-const hudLon = document.getElementById('hud-lon');
-
-function updateUI(progress) {
-  const sectionCount = captions.length;
-  const idx = Math.min(sectionCount - 1, Math.floor(progress * sectionCount * 0.999));
-  captions.forEach((el, i) => el.classList.toggle('in', i === idx));
-  progressBar.style.height = (progress * 100).toFixed(2) + '%';
-  hudDepth.textContent = String(Math.floor(progress * 9420)).padStart(4, '0') + ' м';
-  hudLat.textContent = (78.220 + progress * 0.014).toFixed(3) + '°с.ш.';
-  hudLon.textContent = (15.651 + progress * 0.022).toFixed(3) + '°в.д.';
-}
-
-// ===================================================================
-//                            RENDER LOOP
-// ===================================================================
-const clock = new THREE.Clock();
-let lastChimeIdx = -1;
-let _prevT = 0;
-
-function frame() {
-  requestAnimationFrame(frame);
-  const t = clock.getElapsedTime();
-  const dt = t - _prevT;
-  _prevT = t;
-  
-  scrollSmoothed += (scrollTarget - scrollSmoothed) * 0.07;
-  mouseX += (mouseTX - mouseX) * 0.05;
-  mouseY += (mouseTY - mouseY) * 0.05;
-  
-  const progress = scrollSmoothed / maxScroll();
-  const totalDescent = (SHARD_COUNT - 1) * SHARD_SPACING;
-  camera.position.y = -progress * totalDescent;
-  camera.position.x = mouseX * 1.4 + Math.sin(t * 0.18) * 0.25;
-  camera.position.z = 7.5 - Math.abs(Math.sin(progress * Math.PI * SHARD_COUNT)) * 1.2 + mouseY * 0.6;
-  camera.lookAt(0, camera.position.y - 0.4 + mouseY * 0.8, 0);
-  
-  const nearestIdx = Math.round(progress * (SHARD_COUNT - 1));
-  if (nearestIdx !== lastChimeIdx && nearestIdx >= 0 && nearestIdx < SHARD_COUNT) {
-    lastChimeIdx = nearestIdx;
-    playChime(nearestIdx);
-  }
-  
-  for (const s of shards) {
-    if (s.userData.bg) {
-      s.rotation.y += s.userData.spin;
-      s.rotation.x += s.userData.spin * 0.5;
-    } else {
-      s.rotation.y += s.userData.spinY;
-      s.rotation.x += s.userData.spinX;
-      const p = s.userData.baseScale +
-        Math.sin(t * s.userData.pulseSpeed + s.userData.pulsePhase) * s.userData.pulseAmp;
-      s.scale.setScalar(p);
-      if (s.userData.basePos) {
-        s.position.y = s.userData.basePos.y + Math.sin(t * 0.6 + s.userData.basePos.x) * 0.12;
-      }
-      if (s.userData.inner) {
-        s.userData.inner.rotation.y -= s.userData.inner.userData.spinY;
-        s.userData.inner.rotation.x -= s.userData.inner.userData.spinX;
-        const eIntensity = 1.2 +
-          Math.sin(t * s.userData.pulseSpeed * 1.3 + s.userData.pulsePhase + Math.PI) * 0.6;
-        s.userData.inner.material.emissiveIntensity = eIntensity;
-      }
-      if (s.userData.sprite) {
-        const dy = s.position.y - camera.position.y;
-        const op = Math.max(0, 1 - Math.abs(dy) / 6);
-        s.userData.sprite.material.opacity = op;
-        s.userData.sprite.position.y =
-          s.userData.radius * 1.55 + Math.sin(t * 1.5 + s.userData.pulsePhase) * 0.08;
-      }
-    }
-  }
-  
-  const dp = dust.geometry.attributes.position;
-  for (let i = 0; i < dustCount; i++) {
-    dp.array[i*3+1] -= dustSpeed[i];
-    if (dp.array[i*3+1] < camera.position.y - 35) {
-      dp.array[i*3+1] = camera.position.y + 35;
-      dp.array[i*3] = (Math.random() - 0.5) * 50;
-    }
-  }
-  dp.needsUpdate = true;
-  dust.position.x = mouseX * 0.6;
-  
-  aurora1.position.set(
-    Math.cos(t * 0.35) * 5,
-    camera.position.y + Math.sin(t * 0.5) * 2.5,
-    Math.sin(t * 0.4) * 3
-  );
-  aurora2.position.set(
-    Math.cos(t * 0.35 + Math.PI) * 5,
-    camera.position.y + Math.sin(t * 0.5 + Math.PI) * 2.5,
-    Math.sin(t * 0.4 + Math.PI) * 3
-  );
-  aurora3.position.set(
-    Math.cos(t * 0.22) * 3,
-    camera.position.y + Math.cos(t * 0.3) * 4,
-    -3 + Math.sin(t * 0.5) * 2
-  );
-  
-  updateFragments(dt);
-  updateUI(progress);
-  renderer.render(scene, camera);
-}
-frame();
-
-// ===================================================================
 //                   OVERLAY CANVAS (ICE TRAIL)
 // ===================================================================
 const overlay = document.createElement('canvas');
@@ -1469,18 +1376,26 @@ function renderOverlay() {
 renderOverlay();
 
 // ===================================================================
-//                   CRYSTAL EXPLOSION ON CLICK
+//    CRYSTAL EXPLOSION — все const до первого вызова frame()
 // ===================================================================
-const raycast = new THREE.Raycaster();
-const clickV  = new THREE.Vector2();
+const raycast    = new THREE.Raycaster();
+const clickV     = new THREE.Vector2();
 const fragGroups = [];
 const fragDummy  = new THREE.Object3D();
-
-const fragMat = new THREE.MeshPhysicalMaterial({
+const fragMat    = new THREE.MeshPhysicalMaterial({
   color: 0xeaf2ff, metalness: 0, roughness: 0.12,
   transmission: 0.75, thickness: 0.5, ior: 1.33,
   clearcoat: 1.0, clearcoatRoughness: 0.08, envMapIntensity: 1.5,
 });
+
+function getShardMeshes() {
+  const meshes = [], map = new Map();
+  for (const g of shards) {
+    if (g.userData.bg || g.userData.exploding) continue;
+    g.traverse((c) => { if (c.isMesh) { meshes.push(c); map.set(c, g); } });
+  }
+  return { meshes, map };
+}
 
 function explodeShard(group) {
   if (group.userData.exploding) return;
@@ -1488,12 +1403,10 @@ function explodeShard(group) {
   const center = group.position.clone();
   const r = (group.userData.radius || 1.5) * group.scale.x;
   const COUNT = 300;
-
   const geo  = new THREE.IcosahedronGeometry(0.055, 0);
   const inst = new THREE.InstancedMesh(geo, fragMat, COUNT);
   inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   scene.add(inst);
-
   const pos = [], vel = [], rot = [], rotV = [];
   for (let j = 0; j < COUNT; j++) {
     const theta = Math.random() * Math.PI * 2;
@@ -1504,16 +1417,12 @@ function explodeShard(group) {
       center.y + rad * Math.sin(phi) * Math.sin(theta),
       center.z + rad * Math.cos(phi)
     );
-    const dir   = p.clone().sub(center).normalize();
-    const speed = 0.07 + Math.random() * 0.13;
-    const v = dir.multiplyScalar(speed);
+    const v = p.clone().sub(center).normalize().multiplyScalar(0.07 + Math.random() * 0.13);
     v.x += (Math.random() - 0.5) * 0.04;
     v.y += (Math.random() - 0.5) * 0.04;
     v.z += (Math.random() - 0.5) * 0.04;
     const rv = new THREE.Vector3(
-      (Math.random() - 0.5) * 0.14,
-      (Math.random() - 0.5) * 0.14,
-      (Math.random() - 0.5) * 0.14
+      (Math.random() - 0.5) * 0.14, (Math.random() - 0.5) * 0.14, (Math.random() - 0.5) * 0.14
     );
     fragDummy.position.copy(p);
     fragDummy.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
@@ -1525,17 +1434,14 @@ function explodeShard(group) {
   }
   inst.instanceMatrix.needsUpdate = true;
   group.visible = false;
-
   fragGroups.push({ inst, pos, vel, rot, rotV, center, shard: group, phase: 'out', age: 0 });
 }
 
 function updateFragments(dt) {
-  const OUT_DUR  = 1.8;
-  const IN_DUR   = 1.2;
+  const OUT_DUR = 1.8, IN_DUR = 1.2;
   for (let i = fragGroups.length - 1; i >= 0; i--) {
     const fg = fragGroups[i];
     fg.age += dt;
-
     if (fg.phase === 'out') {
       for (let j = 0; j < fg.pos.length; j++) {
         fg.pos[j].addScaledVector(fg.vel[j], 1);
@@ -1550,7 +1456,6 @@ function updateFragments(dt) {
       }
       fg.inst.instanceMatrix.needsUpdate = true;
       if (fg.age >= OUT_DUR) { fg.phase = 'in'; fg.age = 0; }
-
     } else {
       const ease = 1 - Math.pow(1 - Math.min(1, fg.age / IN_DUR), 3);
       let done = true;
@@ -1576,26 +1481,13 @@ function updateFragments(dt) {
   }
 }
 
-// Raycasting helpers
-function getShardMeshes() {
-  const meshes = [], map = new Map();
-  for (const g of shards) {
-    if (g.userData.bg || g.userData.exploding) continue;
-    g.traverse((c) => { if (c.isMesh) { meshes.push(c); map.set(c, g); } });
-  }
-  return { meshes, map };
-}
-
 canvas.addEventListener('click', (e) => {
   clickV.x =  (e.clientX / window.innerWidth)  * 2 - 1;
   clickV.y = -(e.clientY / window.innerHeight) * 2 + 1;
   raycast.setFromCamera(clickV, camera);
   const { meshes, map } = getShardMeshes();
   const hits = raycast.intersectObjects(meshes);
-  if (hits.length > 0) {
-    const g = map.get(hits[0].object);
-    if (g) explodeShard(g);
-  }
+  if (hits.length > 0) { const g = map.get(hits[0].object); if (g) explodeShard(g); }
 });
 
 canvas.addEventListener('mousemove', (e) => {
@@ -1605,6 +1497,191 @@ canvas.addEventListener('mousemove', (e) => {
   const { meshes } = getShardMeshes();
   canvas.style.cursor = raycast.intersectObjects(meshes).length > 0 ? 'pointer' : '';
 });
+
+// ===================================================================
+//                            UI UPDATES
+// ===================================================================
+const captions    = document.querySelectorAll('.caption');
+const progressBar = document.getElementById('progress-bar');
+const hudDepth    = document.getElementById('hud-depth');
+const hudLat      = document.getElementById('hud-lat');
+const hudLon      = document.getElementById('hud-lon');
+let currentLang   = 'ru';
+
+function updateUI(progress) {
+  const sectionCount = captions.length;
+  const idx = Math.min(sectionCount - 1, Math.floor(progress * sectionCount * 0.999));
+  captions.forEach((el, i) => el.classList.toggle('in', i === idx));
+  progressBar.style.height = (progress * 100).toFixed(2) + '%';
+  const en = currentLang === 'en';
+  hudDepth.textContent = String(Math.floor(progress * 9420)).padStart(4, '0') + (en ? ' m'    : ' м');
+  hudLat.textContent   = (78.220 + progress * 0.014).toFixed(3)               + (en ? '°N'   : '°с.ш.');
+  hudLon.textContent   = (15.651 + progress * 0.022).toFixed(3)               + (en ? '°E'   : '°в.д.');
+}
+
+// ===================================================================
+//                            RENDER LOOP
+// ===================================================================
+const clock = new THREE.Clock();
+let lastChimeIdx = -1;
+let _prevT = 0;
+
+function frame() {
+  requestAnimationFrame(frame);
+  const t  = clock.getElapsedTime();
+  const dt = t - _prevT;
+  _prevT   = t;
+
+  scrollSmoothed += (scrollTarget - scrollSmoothed) * 0.07;
+  mouseX += (mouseTX - mouseX) * 0.05;
+  mouseY += (mouseTY - mouseY) * 0.05;
+
+  const progress     = scrollSmoothed / maxScroll();
+  const totalDescent = (SHARD_COUNT - 1) * SHARD_SPACING;
+  camera.position.y  = -progress * totalDescent;
+  camera.position.x  = mouseX * 1.4 + Math.sin(t * 0.18) * 0.25;
+  camera.position.z  = 7.5 - Math.abs(Math.sin(progress * Math.PI * SHARD_COUNT)) * 1.2 + mouseY * 0.6;
+  camera.lookAt(0, camera.position.y - 0.4 + mouseY * 0.8, 0);
+
+  const nearestIdx = Math.round(progress * (SHARD_COUNT - 1));
+  if (nearestIdx !== lastChimeIdx && nearestIdx >= 0 && nearestIdx < SHARD_COUNT) {
+    lastChimeIdx = nearestIdx;
+    playChime(nearestIdx);
+  }
+
+  for (const s of shards) {
+    if (s.userData.bg) {
+      s.rotation.y += s.userData.spin;
+      s.rotation.x += s.userData.spin * 0.5;
+    } else {
+      s.rotation.y += s.userData.spinY;
+      s.rotation.x += s.userData.spinX;
+      const p = s.userData.baseScale +
+        Math.sin(t * s.userData.pulseSpeed + s.userData.pulsePhase) * s.userData.pulseAmp;
+      s.scale.setScalar(p);
+      if (s.userData.basePos)
+        s.position.y = s.userData.basePos.y + Math.sin(t * 0.6 + s.userData.basePos.x) * 0.12;
+      if (s.userData.inner) {
+        s.userData.inner.rotation.y -= s.userData.inner.userData.spinY;
+        s.userData.inner.rotation.x -= s.userData.inner.userData.spinX;
+        s.userData.inner.material.emissiveIntensity = 1.2 +
+          Math.sin(t * s.userData.pulseSpeed * 1.3 + s.userData.pulsePhase + Math.PI) * 0.6;
+      }
+      if (s.userData.sprite) {
+        const dy = s.position.y - camera.position.y;
+        s.userData.sprite.material.opacity = Math.max(0, 1 - Math.abs(dy) / 6);
+        s.userData.sprite.position.y =
+          s.userData.radius * 1.55 + Math.sin(t * 1.5 + s.userData.pulsePhase) * 0.08;
+      }
+    }
+  }
+
+  const dp = dust.geometry.attributes.position;
+  for (let i = 0; i < dustCount; i++) {
+    dp.array[i*3+1] -= dustSpeed[i];
+    if (dp.array[i*3+1] < camera.position.y - 35) {
+      dp.array[i*3+1] = camera.position.y + 35;
+      dp.array[i*3]   = (Math.random() - 0.5) * 50;
+    }
+  }
+  dp.needsUpdate = true;
+  dust.position.x = mouseX * 0.6;
+
+  aurora1.position.set(Math.cos(t*0.35)*5, camera.position.y + Math.sin(t*0.5)*2.5, Math.sin(t*0.4)*3);
+  aurora2.position.set(Math.cos(t*0.35+Math.PI)*5, camera.position.y + Math.sin(t*0.5+Math.PI)*2.5, Math.sin(t*0.4+Math.PI)*3);
+  aurora3.position.set(Math.cos(t*0.22)*3, camera.position.y + Math.cos(t*0.3)*4, -3 + Math.sin(t*0.5)*2);
+
+  updateFragments(dt);
+  updateUI(progress);
+  renderer.render(scene, camera);
+}
+frame();
+
+// ===================================================================
+//                         LANGUAGE TOGGLE
+// ===================================================================
+const LANGS = {
+  ru: {
+    sound_on: 'Звук · Вкл', sound_off: 'Звук · Выкл',
+    hud: ['ШИР', 'ДОЛГ', 'ГЛУБ', 'ТЕМП'],
+    progress: 'СПУСК', scroll: 'ПРОКРУТИ ВНИЗ', overpull: 'Потяни сильнее',
+    nav: ['Опись', 'Объекты', 'Студия'],
+    secret_h1: 'Мы всегда<br>рядом.',
+    secret_back: '↑ Прокрути вверх, чтобы вернуться',
+    caps: [
+      ['Студия · с MMXXVI',   'Архив,<br>что <em>не тает.</em>',      '◍ Объект 00', 'Иней · оммаж'],
+      ['Глубина 01 · Память', 'Имена,<br><em>которых нет.</em>',      '◍ Объект 01', 'опись с 1937'],
+      ['Глубина 02 · Голоса', 'Хор<br>под <em>коркой.</em>',         '◍ Объект 02', 'шесть голосов'],
+      ['Глубина 03 · Сны',    'Сны<br><em>в стазисе.</em>',          '◍ Объект 03', 'не вскрывать'],
+      ['Конец спуска',        'Дальше<br><em>только лёд.</em>',       '◍ Объект ∞',  'хранится вечно'],
+    ],
+    outro_h3: ['Манифест', 'Опись', 'Координаты'],
+    outro_h2: 'Мы пишем холодом,<br>чтобы помнили долго.',
+    foot: ['© MMXXVI — Оммаж, не аффилировано', 'Создано Клодом ✸'],
+  },
+  en: {
+    sound_on: 'Sound · On', sound_off: 'Sound · Off',
+    hud: ['LAT', 'LON', 'DEPTH', 'TEMP'],
+    progress: 'DESCENT', scroll: 'SCROLL DOWN', overpull: 'Pull harder',
+    nav: ['Index', 'Objects', 'Studio'],
+    secret_h1: 'We\'re always<br>near.',
+    secret_back: '↑ Scroll up to return',
+    caps: [
+      ['Studio · since MMXXVI', 'Archive<br>that <em>never melts.</em>',   '◍ Object 00', 'Inei · homage'],
+      ['Depth 01 · Memory',     'Names<br><em>that never were.</em>',       '◍ Object 01', 'registry since 1937'],
+      ['Depth 02 · Voices',     'Choir<br><em>beneath the crust.</em>',     '◍ Object 02', 'six voices'],
+      ['Depth 03 · Dreams',     'Dreams<br><em>in stasis.</em>',            '◍ Object 03', 'do not open'],
+      ['End of descent',        'Beyond<br><em>only ice.</em>',             '◍ Object ∞',  'stored forever'],
+    ],
+    outro_h3: ['Manifest', 'Index', 'Coordinates'],
+    outro_h2: 'We write in cold,<br>so they remember long.',
+    foot: ['© MMXXVI — Homage, not affiliated', 'Made by Claude ✸'],
+  },
+};
+
+function applyLang(lang) {
+  currentLang = lang;
+  const L = LANGS[lang];
+  document.getElementById('lang-ru').classList.toggle('active', lang === 'ru');
+  document.getElementById('lang-en').classList.toggle('active', lang === 'en');
+  // Nav
+  const ns = document.querySelectorAll('.menu > span');
+  L.nav.forEach((t, i) => { if (ns[i]) ns[i].textContent = t; });
+  // Sound label
+  soundLabel.textContent = audio.enabled ? L.sound_on : L.sound_off;
+  // HUD labels
+  document.querySelectorAll('.hud .row').forEach((r, i) => {
+    if (L.hud[i]) r.querySelector('span').textContent = L.hud[i];
+  });
+  // Misc
+  document.querySelector('.progress-label').textContent = L.progress;
+  document.querySelector('.scroll-hint').innerHTML      = L.scroll;
+  document.querySelector('.overpull-label').textContent = L.overpull;
+  document.querySelector('.secret-inner h1').innerHTML  = L.secret_h1;
+  document.querySelector('.secret-back').textContent    = L.secret_back;
+  // Captions
+  captions.forEach((cap, i) => {
+    const c = L.caps[i]; if (!c) return;
+    cap.querySelector('.eyebrow').textContent = c[0];
+    cap.querySelector('h1').innerHTML         = c[1];
+    const ms = cap.querySelectorAll('.meta span');
+    if (ms[0]) ms[0].textContent = c[2];
+    if (ms[1]) ms[1].textContent = c[3];
+  });
+  // Outro
+  document.querySelectorAll('.outro h3').forEach((h, i) => { if (L.outro_h3[i]) h.textContent = L.outro_h3[i]; });
+  document.querySelector('.outro h2').innerHTML = L.outro_h2;
+  document.querySelectorAll('.outro-foot span').forEach((s, i) => { if (L.foot[i]) s.textContent = L.foot[i]; });
+}
+
+document.getElementById('lang-ru').addEventListener('click', () => applyLang('ru'));
+document.getElementById('lang-en').addEventListener('click', () => applyLang('en'));
+// Обновлять лейбл звука при переключении — патчим существующий обработчик
+soundBtn.addEventListener('click', () => {
+  const L = LANGS[currentLang];
+  soundLabel.textContent = audio.enabled ? L.sound_on : L.sound_off;
+}, { capture: true });
+applyLang('ru');
 </script>
 
 </body>
