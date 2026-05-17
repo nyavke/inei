@@ -164,6 +164,11 @@ def recognize_gesture(landmarks):
     def is_extended(tip, pip):
         return landmarks[tip].y < landmarks[pip].y
 
+    # 👍 Распознавание большого пальца:
+    # В зеркальном режиме камеры (facingMode: "user") большой палец 
+    # при жесте "лайк" имеет меньшую координату X, чем основание
+    thumb_extended = landmarks[4].x < landmarks[2].x
+    
     fingers = [
         is_extended(8, 6),   # Указательный
         is_extended(12, 10), # Средний
@@ -172,8 +177,14 @@ def recognize_gesture(landmarks):
     ]
     count = sum(fingers)
 
+    # 👇 НОВЫЙ ЖЕСТ: Лайк (большой палец вверх, остальные закрыты) → отправляем "loh"
+    # Проверяем ПЕРЕД "back", чтобы избежать конфликта (оба имеют count == 0)
+    if thumb_extended and count == 0:
+        return "loh"
+    
+    # Остальные жесты
     if count == 4: return "stop"
-    elif count == 0: return "back"
+    elif count == 0: return "back"  # Кулак — движение назад
     elif count == 1 and fingers[0]: return "forward"
     elif count == 2 and fingers[0] and fingers[1]: return "right"
     elif count == 3 and fingers[0] and fingers[1] and fingers[2]: return "left"
@@ -234,7 +245,11 @@ try:
                 if result.rc == 0:
                     print(f"📡 Sent: `{stable_gesture}`")
                     last_command = stable_gesture
-                    label_html = f'🎯 {stable_gesture.upper()}'
+                    # 👇 Обновляем отображение статуса
+                    if stable_gesture == "loh":
+                        label_html = '👍 loh'
+                    else:
+                        label_html = f'🎯 {stable_gesture.upper()}'
                     mask_img = ""  # Скрываем маску на момент отправки
 
         time.sleep(0.08) # ~12 FPS
