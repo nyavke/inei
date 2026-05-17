@@ -18,8 +18,8 @@ def fun_mqtt_callback(topic_data):
 
     # Логика выполнения команд
     if msg == "back":
-      base_x.set_motor_speed(2, -10)
-      base_x.set_motor_speed(3, -10)
+      base_x.set_motor_speed(2, -20)
+      base_x.set_motor_speed(3, -20)
     elif msg == "stop":
       base_x.set_motor_speed(3, 0)
       base_x.set_motor_speed(2, 0)
@@ -31,6 +31,9 @@ def fun_mqtt_callback(topic_data):
         base_x.set_motor_speed(1, -50)
         wait(1)
         base_x.set_motor_speed(1, 0)
+    elif msg == "loh":# Выключить свет
+        base_x.set_motor_speed(2, 20)
+        base_x.set_motor_speed(3, 20)
     else:
         label0.setText("Unknown msg: " + msg)
 
