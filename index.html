@@ -576,60 +576,7 @@
   }
   #secret.in .secret-back { opacity: 1; }
   
-  /* ===================================================================
-     TRANSMISSION OVERLAY
-     =================================================================== */
-  #transmission {
-    position: fixed;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 60;
-    pointer-events: none;
-    width: min(460px, 88vw);
-    padding: 30px 40px;
-    border: 1px solid rgba(102,200,255,0.2);
-    background: rgba(5,6,8,0.92);
-    backdrop-filter: blur(14px);
-    text-align: center;
-    opacity: 0;
-    transition: opacity 0.5s ease;
-  }
-  #transmission.show { opacity: 1; }
-  #transmission::before, #transmission::after {
-    content: '';
-    position: absolute;
-    background: var(--aurora-2);
-  }
-  #transmission::before { top: 0; left: 0; width: 12px; height: 1px; }
-  #transmission::after  { bottom: 0; right: 0; width: 12px; height: 1px; }
-  .tx-bar {
-    font-size: 9px;
-    letter-spacing: 0.45em;
-    color: var(--aurora-2);
-    text-transform: uppercase;
-    margin-bottom: 20px;
-  }
-  .tx-title {
-    font-family: 'Fraunces', serif;
-    font-style: italic;
-    font-weight: 200;
-    font-size: clamp(18px, 2.8vw, 30px);
-    color: var(--ice-1);
-    letter-spacing: 0.04em;
-    margin-bottom: 18px;
-    line-height: 1.25;
-  }
-  .tx-data {
-    font-size: 8px;
-    letter-spacing: 0.3em;
-    color: rgba(231,238,246,0.3);
-    line-height: 2.2;
-    text-transform: uppercase;
-  }
-  .tx-blink { animation: tx-blink 1s step-end infinite; }
-  @keyframes tx-blink { 50% { opacity: 0; } }
-
-  @media (max-width: 720px) {
+@media (max-width: 720px) {
     .outro-inner { grid-template-columns: 1fr; gap: 36px; }
     .progress-wrap { right: 14px; }
     .progress-track { height: 140px; }
@@ -752,13 +699,6 @@
 <div id="overpull">
   <div class="overpull-label">Потяни сильнее</div>
   <div class="overpull-bar"><div class="overpull-fill" id="overpull-fill"></div></div>
-</div>
-
-<!-- Incoming transmission -->
-<div id="transmission">
-  <div class="tx-bar">▌ Входящий сигнал <span class="tx-blink">█</span></div>
-  <div class="tx-title" id="tx-title">Объект найден</div>
-  <div class="tx-data" id="tx-data">78.234°С.Ш. · 15.673°В.Д.<br>ГЛУБ 9417 М · −38.4°C</div>
 </div>
 
 <!-- Secret hidden location -->
@@ -1388,10 +1328,13 @@ function updateUI(progress) {
 // ===================================================================
 const clock = new THREE.Clock();
 let lastChimeIdx = -1;
+let _prevT = 0;
 
 function frame() {
   requestAnimationFrame(frame);
   const t = clock.getElapsedTime();
+  const dt = t - _prevT;
+  _prevT = t;
   
   scrollSmoothed += (scrollTarget - scrollSmoothed) * 0.07;
   mouseX += (mouseTX - mouseX) * 0.05;
@@ -1467,13 +1410,14 @@ function frame() {
     -3 + Math.sin(t * 0.5) * 2
   );
   
+  updateFragments(dt);
   updateUI(progress);
   renderer.render(scene, camera);
 }
 frame();
 
 // ===================================================================
-//                   OVERLAY CANVAS (TRAIL + CRACKS)
+//                   OVERLAY CANVAS (ICE TRAIL)
 // ===================================================================
 const overlay = document.createElement('canvas');
 overlay.style.cssText = 'position:fixed;inset:0;z-index:50;pointer-events:none;';
@@ -1483,7 +1427,6 @@ function resizeOverlay() { overlay.width = window.innerWidth; overlay.height = w
 resizeOverlay();
 window.addEventListener('resize', resizeOverlay);
 
-// Cursor trail particles
 const trailParts = [];
 const PCOLS = ['#66c8ff', '#9fffd9', '#ff7ab6', '#c8e8ff'];
 let plx = 0, ply = 0;
@@ -1504,50 +1447,9 @@ window.addEventListener('mousemove', (e) => {
   }
 }, { passive: true });
 
-// Click crack effect
-const cracks = [];
-function genCrack(x, y, angle, len, depth, lines) {
-  if (depth <= 0 || len < 7) return;
-  const w = (Math.random() - 0.5) * len * 0.38;
-  const nx = x + Math.cos(angle) * len + Math.cos(angle + Math.PI / 2) * w;
-  const ny = y + Math.sin(angle) * len + Math.sin(angle + Math.PI / 2) * w;
-  lines.push({ x1: x, y1: y, x2: nx, y2: ny });
-  const b = Math.random() < 0.5 ? 2 : 1;
-  for (let i = 0; i < b; i++)
-    genCrack(nx, ny, angle + (Math.random() - 0.5) * 1.2, len * (0.45 + Math.random() * 0.35), depth - 1, lines);
-}
-window.addEventListener('click', (e) => {
-  const lines = [];
-  const arms = 5 + Math.floor(Math.random() * 4);
-  for (let i = 0; i < arms; i++) {
-    const a = (i / arms) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
-    genCrack(e.clientX, e.clientY, a, 55 + Math.random() * 65, 5, lines);
-  }
-  cracks.push({ lines, a: 1.0, decay: 0.006 + Math.random() * 0.004 });
-}, { passive: true });
-
-// Overlay render loop
 function renderOverlay() {
   requestAnimationFrame(renderOverlay);
   oc.clearRect(0, 0, overlay.width, overlay.height);
-  // Cracks
-  for (let i = cracks.length - 1; i >= 0; i--) {
-    const c = cracks[i];
-    c.a -= c.decay;
-    if (c.a <= 0) { cracks.splice(i, 1); continue; }
-    oc.save();
-    oc.globalAlpha = c.a;
-    oc.strokeStyle = '#66c8ff';
-    oc.shadowColor = '#66c8ff';
-    oc.shadowBlur = 7;
-    oc.lineWidth = 0.8;
-    oc.lineCap = 'round';
-    for (const l of c.lines) {
-      oc.beginPath(); oc.moveTo(l.x1, l.y1); oc.lineTo(l.x2, l.y2); oc.stroke();
-    }
-    oc.restore();
-  }
-  // Trail particles
   for (let i = trailParts.length - 1; i >= 0; i--) {
     const p = trailParts[i];
     p.a -= p.decay;
@@ -1567,31 +1469,142 @@ function renderOverlay() {
 renderOverlay();
 
 // ===================================================================
-//                     INCOMING TRANSMISSION
+//                   CRYSTAL EXPLOSION ON CLICK
 // ===================================================================
-const txEl = document.getElementById('transmission');
-const txTitle = document.getElementById('tx-title');
-const txData = document.getElementById('tx-data');
+const raycast = new THREE.Raycaster();
+const clickV  = new THREE.Vector2();
+const fragGroups = [];
+const fragDummy  = new THREE.Object3D();
 
-const TRANSMISSIONS = [
-  { title: 'Объект 01 · сигнал активен',  data: '78.220°С.Ш. · 15.651°В.Д.<br>Пакет 001 · Память · Статус: заморожено' },
-  { title: 'Температура в норме',          data: 'Архив Иней · Шпицберген<br>Темп −38.4°C · Целостность 100%' },
-  { title: 'Объект 03 · не вскрывать',    data: '78.234°С.Ш. · 15.673°В.Д.<br>Сны · 1989 · Уровень доступа: 0' },
-  { title: 'Сигнал из глубины',           data: 'Глуб 9417 м · Шпицберген<br>Передача завершена · Архив активен' },
-  { title: 'Мы пишем холодом',            data: 'Иней · MMXXVI · Оммаж<br>Чтобы помнили долго' },
-];
+const fragMat = new THREE.MeshPhysicalMaterial({
+  color: 0xeaf2ff, metalness: 0, roughness: 0.12,
+  transmission: 0.75, thickness: 0.5, ior: 1.33,
+  clearcoat: 1.0, clearcoatRoughness: 0.08, envMapIntensity: 1.5,
+});
 
-function showTx() {
-  const tx = TRANSMISSIONS[Math.floor(Math.random() * TRANSMISSIONS.length)];
-  txTitle.textContent = tx.title;
-  txData.innerHTML = tx.data;
-  txEl.classList.add('show');
-  setTimeout(() => {
-    txEl.classList.remove('show');
-    setTimeout(showTx, 18000 + Math.random() * 14000);
-  }, 4200);
+function explodeShard(group) {
+  if (group.userData.exploding) return;
+  group.userData.exploding = true;
+  const center = group.position.clone();
+  const r = (group.userData.radius || 1.5) * group.scale.x;
+  const COUNT = 300;
+
+  const geo  = new THREE.IcosahedronGeometry(0.055, 0);
+  const inst = new THREE.InstancedMesh(geo, fragMat, COUNT);
+  inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(inst);
+
+  const pos = [], vel = [], rot = [], rotV = [];
+  for (let j = 0; j < COUNT; j++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi   = Math.acos(2 * Math.random() - 1);
+    const rad   = Math.cbrt(Math.random()) * r;
+    const p = new THREE.Vector3(
+      center.x + rad * Math.sin(phi) * Math.cos(theta),
+      center.y + rad * Math.sin(phi) * Math.sin(theta),
+      center.z + rad * Math.cos(phi)
+    );
+    const dir   = p.clone().sub(center).normalize();
+    const speed = 0.07 + Math.random() * 0.13;
+    const v = dir.multiplyScalar(speed);
+    v.x += (Math.random() - 0.5) * 0.04;
+    v.y += (Math.random() - 0.5) * 0.04;
+    v.z += (Math.random() - 0.5) * 0.04;
+    const rv = new THREE.Vector3(
+      (Math.random() - 0.5) * 0.14,
+      (Math.random() - 0.5) * 0.14,
+      (Math.random() - 0.5) * 0.14
+    );
+    fragDummy.position.copy(p);
+    fragDummy.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+    fragDummy.scale.setScalar(0.4 + Math.random() * 1.2);
+    fragDummy.updateMatrix();
+    inst.setMatrixAt(j, fragDummy.matrix);
+    pos.push(p); vel.push(v);
+    rot.push(fragDummy.rotation.clone()); rotV.push(rv);
+  }
+  inst.instanceMatrix.needsUpdate = true;
+  group.visible = false;
+
+  fragGroups.push({ inst, pos, vel, rot, rotV, center, shard: group, phase: 'out', age: 0 });
 }
-setTimeout(showTx, 9000);
+
+function updateFragments(dt) {
+  const OUT_DUR  = 1.8;
+  const IN_DUR   = 1.2;
+  for (let i = fragGroups.length - 1; i >= 0; i--) {
+    const fg = fragGroups[i];
+    fg.age += dt;
+
+    if (fg.phase === 'out') {
+      for (let j = 0; j < fg.pos.length; j++) {
+        fg.pos[j].addScaledVector(fg.vel[j], 1);
+        fg.vel[j].y -= 0.003;
+        fg.rot[j].x += fg.rotV[j].x;
+        fg.rot[j].y += fg.rotV[j].y;
+        fragDummy.position.copy(fg.pos[j]);
+        fragDummy.rotation.copy(fg.rot[j]);
+        fragDummy.scale.setScalar(0.4 + (j % 5) * 0.18);
+        fragDummy.updateMatrix();
+        fg.inst.setMatrixAt(j, fragDummy.matrix);
+      }
+      fg.inst.instanceMatrix.needsUpdate = true;
+      if (fg.age >= OUT_DUR) { fg.phase = 'in'; fg.age = 0; }
+
+    } else {
+      const ease = 1 - Math.pow(1 - Math.min(1, fg.age / IN_DUR), 3);
+      let done = true;
+      for (let j = 0; j < fg.pos.length; j++) {
+        fg.pos[j].lerp(fg.center, 0.055 + ease * 0.09);
+        if (fg.pos[j].distanceTo(fg.center) > 0.07) done = false;
+        fg.rot[j].x += fg.rotV[j].x * (1 - ease);
+        fg.rot[j].y += fg.rotV[j].y * (1 - ease);
+        fragDummy.position.copy(fg.pos[j]);
+        fragDummy.rotation.copy(fg.rot[j]);
+        fragDummy.updateMatrix();
+        fg.inst.setMatrixAt(j, fragDummy.matrix);
+      }
+      fg.inst.instanceMatrix.needsUpdate = true;
+      if (done || fg.age >= IN_DUR + 0.3) {
+        scene.remove(fg.inst);
+        fg.inst.geometry.dispose();
+        fg.shard.visible = true;
+        fg.shard.userData.exploding = false;
+        fragGroups.splice(i, 1);
+      }
+    }
+  }
+}
+
+// Raycasting helpers
+function getShardMeshes() {
+  const meshes = [], map = new Map();
+  for (const g of shards) {
+    if (g.userData.bg || g.userData.exploding) continue;
+    g.traverse((c) => { if (c.isMesh) { meshes.push(c); map.set(c, g); } });
+  }
+  return { meshes, map };
+}
+
+canvas.addEventListener('click', (e) => {
+  clickV.x =  (e.clientX / window.innerWidth)  * 2 - 1;
+  clickV.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycast.setFromCamera(clickV, camera);
+  const { meshes, map } = getShardMeshes();
+  const hits = raycast.intersectObjects(meshes);
+  if (hits.length > 0) {
+    const g = map.get(hits[0].object);
+    if (g) explodeShard(g);
+  }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  clickV.x =  (e.clientX / window.innerWidth)  * 2 - 1;
+  clickV.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycast.setFromCamera(clickV, camera);
+  const { meshes } = getShardMeshes();
+  canvas.style.cursor = raycast.intersectObjects(meshes).length > 0 ? 'pointer' : '';
+});
 </script>
 
 </body>
