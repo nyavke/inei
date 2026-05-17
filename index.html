@@ -576,6 +576,59 @@
   }
   #secret.in .secret-back { opacity: 1; }
   
+  /* ===================================================================
+     TRANSMISSION OVERLAY
+     =================================================================== */
+  #transmission {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 60;
+    pointer-events: none;
+    width: min(460px, 88vw);
+    padding: 30px 40px;
+    border: 1px solid rgba(102,200,255,0.2);
+    background: rgba(5,6,8,0.92);
+    backdrop-filter: blur(14px);
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+  #transmission.show { opacity: 1; }
+  #transmission::before, #transmission::after {
+    content: '';
+    position: absolute;
+    background: var(--aurora-2);
+  }
+  #transmission::before { top: 0; left: 0; width: 12px; height: 1px; }
+  #transmission::after  { bottom: 0; right: 0; width: 12px; height: 1px; }
+  .tx-bar {
+    font-size: 9px;
+    letter-spacing: 0.45em;
+    color: var(--aurora-2);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .tx-title {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 200;
+    font-size: clamp(18px, 2.8vw, 30px);
+    color: var(--ice-1);
+    letter-spacing: 0.04em;
+    margin-bottom: 18px;
+    line-height: 1.25;
+  }
+  .tx-data {
+    font-size: 8px;
+    letter-spacing: 0.3em;
+    color: rgba(231,238,246,0.3);
+    line-height: 2.2;
+    text-transform: uppercase;
+  }
+  .tx-blink { animation: tx-blink 1s step-end infinite; }
+  @keyframes tx-blink { 50% { opacity: 0; } }
+
   @media (max-width: 720px) {
     .outro-inner { grid-template-columns: 1fr; gap: 36px; }
     .progress-wrap { right: 14px; }
@@ -699,6 +752,13 @@
 <div id="overpull">
   <div class="overpull-label">Потяни сильнее</div>
   <div class="overpull-bar"><div class="overpull-fill" id="overpull-fill"></div></div>
+</div>
+
+<!-- Incoming transmission -->
+<div id="transmission">
+  <div class="tx-bar">▌ Входящий сигнал <span class="tx-blink">█</span></div>
+  <div class="tx-title" id="tx-title">Объект найден</div>
+  <div class="tx-data" id="tx-data">78.234°С.Ш. · 15.673°В.Д.<br>ГЛУБ 9417 М · −38.4°C</div>
 </div>
 
 <!-- Secret hidden location -->
@@ -1411,6 +1471,127 @@ function frame() {
   renderer.render(scene, camera);
 }
 frame();
+
+// ===================================================================
+//                   OVERLAY CANVAS (TRAIL + CRACKS)
+// ===================================================================
+const overlay = document.createElement('canvas');
+overlay.style.cssText = 'position:fixed;inset:0;z-index:50;pointer-events:none;';
+document.body.appendChild(overlay);
+const oc = overlay.getContext('2d');
+function resizeOverlay() { overlay.width = window.innerWidth; overlay.height = window.innerHeight; }
+resizeOverlay();
+window.addEventListener('resize', resizeOverlay);
+
+// Cursor trail particles
+const trailParts = [];
+const PCOLS = ['#66c8ff', '#9fffd9', '#ff7ab6', '#c8e8ff'];
+let plx = 0, ply = 0;
+window.addEventListener('mousemove', (e) => {
+  if (Math.hypot(e.clientX - plx, e.clientY - ply) < 6) return;
+  plx = e.clientX; ply = e.clientY;
+  const n = 2 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < n; i++) {
+    const s = 0.9 + Math.random() * 2;
+    trailParts.push({
+      x: e.clientX + (Math.random() - 0.5) * 10,
+      y: e.clientY + (Math.random() - 0.5) * 10,
+      vx: (Math.random() - 0.5) * 0.7,
+      vy: -0.5 - Math.random() * 1.1,
+      s, color: PCOLS[Math.floor(Math.random() * PCOLS.length)],
+      a: 1.0, decay: 0.018 + Math.random() * 0.015,
+    });
+  }
+}, { passive: true });
+
+// Click crack effect
+const cracks = [];
+function genCrack(x, y, angle, len, depth, lines) {
+  if (depth <= 0 || len < 7) return;
+  const w = (Math.random() - 0.5) * len * 0.38;
+  const nx = x + Math.cos(angle) * len + Math.cos(angle + Math.PI / 2) * w;
+  const ny = y + Math.sin(angle) * len + Math.sin(angle + Math.PI / 2) * w;
+  lines.push({ x1: x, y1: y, x2: nx, y2: ny });
+  const b = Math.random() < 0.5 ? 2 : 1;
+  for (let i = 0; i < b; i++)
+    genCrack(nx, ny, angle + (Math.random() - 0.5) * 1.2, len * (0.45 + Math.random() * 0.35), depth - 1, lines);
+}
+window.addEventListener('click', (e) => {
+  const lines = [];
+  const arms = 5 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < arms; i++) {
+    const a = (i / arms) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+    genCrack(e.clientX, e.clientY, a, 55 + Math.random() * 65, 5, lines);
+  }
+  cracks.push({ lines, a: 1.0, decay: 0.006 + Math.random() * 0.004 });
+}, { passive: true });
+
+// Overlay render loop
+function renderOverlay() {
+  requestAnimationFrame(renderOverlay);
+  oc.clearRect(0, 0, overlay.width, overlay.height);
+  // Cracks
+  for (let i = cracks.length - 1; i >= 0; i--) {
+    const c = cracks[i];
+    c.a -= c.decay;
+    if (c.a <= 0) { cracks.splice(i, 1); continue; }
+    oc.save();
+    oc.globalAlpha = c.a;
+    oc.strokeStyle = '#66c8ff';
+    oc.shadowColor = '#66c8ff';
+    oc.shadowBlur = 7;
+    oc.lineWidth = 0.8;
+    oc.lineCap = 'round';
+    for (const l of c.lines) {
+      oc.beginPath(); oc.moveTo(l.x1, l.y1); oc.lineTo(l.x2, l.y2); oc.stroke();
+    }
+    oc.restore();
+  }
+  // Trail particles
+  for (let i = trailParts.length - 1; i >= 0; i--) {
+    const p = trailParts[i];
+    p.a -= p.decay;
+    if (p.a <= 0) { trailParts.splice(i, 1); continue; }
+    p.x += p.vx; p.y += p.vy; p.vy += 0.045;
+    oc.save();
+    oc.globalAlpha = p.a;
+    oc.fillStyle = p.color;
+    oc.shadowColor = p.color;
+    oc.shadowBlur = 10;
+    const s = p.s;
+    oc.fillRect(p.x - s * 0.35, p.y - s * 1.5, s * 0.7, s * 3);
+    oc.fillRect(p.x - s * 1.5, p.y - s * 0.35, s * 3, s * 0.7);
+    oc.restore();
+  }
+}
+renderOverlay();
+
+// ===================================================================
+//                     INCOMING TRANSMISSION
+// ===================================================================
+const txEl = document.getElementById('transmission');
+const txTitle = document.getElementById('tx-title');
+const txData = document.getElementById('tx-data');
+
+const TRANSMISSIONS = [
+  { title: 'Объект 01 · сигнал активен',  data: '78.220°С.Ш. · 15.651°В.Д.<br>Пакет 001 · Память · Статус: заморожено' },
+  { title: 'Температура в норме',          data: 'Архив Иней · Шпицберген<br>Темп −38.4°C · Целостность 100%' },
+  { title: 'Объект 03 · не вскрывать',    data: '78.234°С.Ш. · 15.673°В.Д.<br>Сны · 1989 · Уровень доступа: 0' },
+  { title: 'Сигнал из глубины',           data: 'Глуб 9417 м · Шпицберген<br>Передача завершена · Архив активен' },
+  { title: 'Мы пишем холодом',            data: 'Иней · MMXXVI · Оммаж<br>Чтобы помнили долго' },
+];
+
+function showTx() {
+  const tx = TRANSMISSIONS[Math.floor(Math.random() * TRANSMISSIONS.length)];
+  txTitle.textContent = tx.title;
+  txData.innerHTML = tx.data;
+  txEl.classList.add('show');
+  setTimeout(() => {
+    txEl.classList.remove('show');
+    setTimeout(showTx, 18000 + Math.random() * 14000);
+  }, 4200);
+}
+setTimeout(showTx, 9000);
 </script>
 
 </body>
