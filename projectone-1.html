@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DARK FAERIE — Управление роботом жестами | LEGO Mindstorms + MQTT</title>
+<meta name="description" content="Проект команды DARK FAERIE — управление роботом LEGO Mindstorms жестами руки через MediaPipe и MQTT.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  /* ============== LIGHT THEME TOKENS ============== */
+  :root {
+    --bg: #fbfbfd;
+    --surface: #ffffff;
+    --surface-elevated: #f5f5f7;
+    --text-primary: #1c1c1e;
+    --text-secondary: #3a3a3c;
+    --text-tertiary: #6c6c70;
+    --accent: #007aff;
+    --accent-glow: #007aff20;
+    --accent-soft: #e3f2fd;
+    --border-light: #e9e9ef;
+    --border-medium: #d9d9df;
+    --green: #34c759;
+    --green-soft: #e8f5e9;
+    --orange: #ff9f0a;
+    --orange-soft: #fff8e7;
+    --purple: #af52de;
+    --purple-soft: #f5ebff;
+    --teal: #64d2ff;
+    --teal-soft: #e6f7ff;
+    --code-bg: #f1f1f5;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Space Grotesk', system-ui, sans-serif;
+    --body: 'Inter', system-ui, -apple-system, sans-serif;
+    --pad: clamp(20px, 4vw, 56px);
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.02);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.02);
+    --shadow-lg: 0 20px 35px -12px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.02);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+  html, body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--body);
+    font-weight: 400;
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+  body {
+    background: linear-gradient(145deg, #fefefe 0%, #f8f8fc 100%);
+  }
+  ::selection {
+    background: var(--accent);
+    color: white;
+  }
+  a { color: inherit; text-decoration: none; }
+  img, svg { display: block; max-width: 100%; }
+
+  /* ============== NAV ============== */
+  nav.top {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px var(--pad);
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border-bottom: 1px solid var(--border-light);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  }
+  nav.top .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 600; color: var(--text-primary);
+  }
+  nav.top .brand svg { width: 20px; height: 20px; stroke: var(--accent); stroke-width: 1.8; fill: none; }
+  nav.top ul { display: flex; gap: 28px; list-style: none; }
+  nav.top ul a { color: var(--text-secondary); transition: color 0.2s; font-weight: 500; }
+  nav.top ul a:hover { color: var(--accent); }
+  nav.top .right { display: flex; align-items: center; gap: 12px; color: var(--text-tertiary); }
+  .pulse {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 0 rgba(52,199,89,0.6);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(52,199,89,0.5); }
+    70% { box-shadow: 0 0 0 10px rgba(52,199,89,0); }
+    100% { box-shadow: 0 0 0 0 rgba(52,199,89,0); }
+  }
+  @media (max-width: 760px) { nav.top ul { display: none; } }
+
+  /* ============== LAYOUT ============== */
+  section { padding: clamp(60px, 10vh, 120px) var(--pad); position: relative; }
+  .container { max-width: 1280px; margin: 0 auto; }
+  .label {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--accent); font-weight: 500; display: flex; align-items: center; gap: 12px;
+  }
+  .label::before { content: ''; width: 32px; height: 2px; background: var(--accent); opacity: 0.5; border-radius: 2px; }
+  h1, h2, h3 { font-family: var(--display); font-weight: 500; color: var(--text-primary); letter-spacing: -0.02em; }
+  h1 { font-size: clamp(44px, 10vw, 140px); font-weight: 600; letter-spacing: -0.03em; line-height: 1.05; }
+  h2 { font-size: clamp(32px, 5vw, 64px); font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
+  h3 { font-size: clamp(20px, 2.2vw, 26px); font-weight: 500; }
+  p { color: var(--text-secondary); font-size: clamp(15px, 1.1vw, 17px); max-width: 62ch; line-height: 1.5; }
+  .lede { font-size: clamp(17px, 1.4vw, 20px); color: var(--text-primary); opacity: 0.85; line-height: 1.45; max-width: 60ch; font-weight: 450; }
+
+  /* ============== HERO ============== */
+  .hero {
+    min-height: 90vh; display: flex; flex-direction: column; justify-content: flex-end;
+    padding-bottom: clamp(50px, 8vh, 100px); position: relative;
+  }
+  .hero-meta {
+    display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap;
+    margin-bottom: clamp(30px, 6vh, 60px);
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+  .hero-meta b { font-weight: 600; color: var(--text-primary); }
+  .hero h1 .gradient-text {
+    background: linear-gradient(135deg, #007aff 0%, #5856d6 60%, #af52de 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero h1 .light-stroke {
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  .hero-sub { margin-top: clamp(28px, 5vh, 56px); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 24px; }
+  .hero-sub p { max-width: 52ch; }
+  .scroll-cue { font-family: var(--mono); font-size: 10px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--text-tertiary); display: flex; align-items: center; gap: 12px; }
+  .scroll-cue .dash { width: 42px; height: 1.5px; background: var(--border-medium); position: relative; overflow: hidden; }
+  .scroll-cue .dash::after { content: ''; position: absolute; inset: 0; background: var(--accent); transform: translateX(-100%); animation: trail 2.2s ease-in-out infinite; }
+  @keyframes trail { 0% { transform: translateX(-100%); } 50% { transform: translateX(0); } 100% { transform: translateX(100%); } }
+
+  /* soft abstract shapes */
+  .bg-shape {
+    position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+  }
+  .bg-shape .blob {
+    position: absolute; top: -20%; right: -15%; width: 70vw; height: 70vw;
+    background: radial-gradient(circle, rgba(0,122,255,0.04) 0%, rgba(88,86,214,0.02) 70%, transparent 100%);
+    border-radius: 50%;
+    filter: blur(70px);
+  }
+  .bg-shape .blob2 {
+    position: absolute; bottom: -15%; left: -10%; width: 60vw; height: 60vw;
+    background: radial-gradient(circle, rgba(175,82,222,0.04) 0%, rgba(100,210,255,0.02) 70%, transparent 100%);
+    border-radius: 50%;
+    filter: blur(80px);
+  }
+
+  /* ============== CARDS ============== */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 24px;
+    padding: clamp(22px, 3vw, 32px);
+    transition: all 0.25s ease;
+    box-shadow: var(--shadow-sm);
+  }
+  .card:hover {
+    border-color: var(--border-medium);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+
+  /* ============== TEAM SECTION (только название команды) ============== */
+  .team-block { display: grid; grid-template-columns: 1fr auto; gap: 48px; align-items: center; }
+  @media (max-width: 860px) { .team-block { grid-template-columns: 1fr; gap: 32px; } }
+  .team-name { font-family: var(--display); font-weight: 600; font-size: clamp(56px, 10vw, 140px); line-height: 0.92; letter-spacing: -0.04em; color: var(--text-primary); }
+  .team-name .accent-word { background: linear-gradient(135deg, #007aff, #5856d6); -webkit-background-clip: text; background-clip: text; color: transparent; font-style: normal; }
+  .crest {
+    width: 160px; height: 160px; border-radius: 50%;
+    background: linear-gradient(135deg, #eef2ff, #ffffff);
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 56px; font-weight: 600; color: var(--accent);
+  }
+  .team-tags { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+  .tag {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 6px 14px; background: var(--surface-elevated); border: 1px solid var(--border-light);
+    border-radius: 40px; color: var(--text-secondary); font-weight: 500;
+  }
+
+  /* ============== PROJECT NAME SECTION ============== */
+  .project-name { font-family: var(--display); font-weight: 600; font-size: clamp(40px, 7vw, 96px); line-height: 1.1; letter-spacing: -0.02em; margin-bottom: 32px; }
+  .project-meta {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    border-top: 1px solid var(--border-light); border-bottom: 1px solid var(--border-light);
+  }
+  .project-meta > div { padding: 22px 20px; border-right: 1px solid var(--border-light); }
+  .project-meta > div:last-child { border-right: none; }
+  .project-meta .k { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px; }
+  .project-meta .v { font-family: var(--display); font-weight: 500; font-size: 20px; color: var(--text-primary); }
+  @media (max-width: 820px) { .project-meta { grid-template-columns: repeat(2, 1fr); } .project-meta > div { border-bottom: 1px solid var(--border-light); } }
+
+  /* ============== WHY GRID (назначение) ============== */
+  .why-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 28px; }
+  @media (max-width: 980px) { .why-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) { .why-grid { grid-template-columns: 1fr; } }
+  .why .card { height: 100%; display: flex; flex-direction: column; gap: 20px; }
+  .why .icon {
+    width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .why h3 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+  .why p { font-size: 14px; opacity: 0.8; }
+
+  /* ============== PIPELINE ============== */
+  .pipeline {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 0;
+    border: 1px solid var(--border-light); border-radius: 24px; overflow: hidden;
+    background: var(--surface); margin-top: 24px;
+  }
+  .pipeline > div {
+    padding: 28px 20px; border-right: 1px solid var(--border-light);
+    display: flex; flex-direction: column; gap: 12px; background: var(--surface);
+  }
+  .pipeline > div:last-child { border-right: none; }
+  .pipeline .n { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; color: var(--accent); font-weight: 500; }
+  .pipeline .ttl { font-family: var(--display); font-weight: 600; font-size: 16px; color: var(--text-primary); }
+  .pipeline .desc { font-size: 12px; color: var(--text-tertiary); line-height: 1.45; margin-top: auto; }
+  .pipeline .ic { height: 40px; color: var(--accent); }
+  .pipeline > div::after {
+    content: '→'; position: absolute; right: -9px; top: 50%; transform: translateY(-50%);
+    width: 18px; height: 18px; background: var(--surface); color: var(--accent);
+    font-family: var(--mono); font-size: 12px; display: grid; place-items: center;
+    border-radius: 20px; border: 1px solid var(--border-light);
+  }
+  .pipeline > div { position: relative; }
+  .pipeline > div:last-child::after { display: none; }
+  @media (max-width: 980px) {
+    .pipeline { grid-template-columns: repeat(2, 1fr); }
+    .pipeline > div { border-bottom: 1px solid var(--border-light); }
+    .pipeline > div::after { display: none; }
+  }
+  @media (max-width: 600px) { .pipeline { grid-template-columns: 1fr; } }
+
+  .specs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 36px; }
+  @media (max-width: 680px) { .specs { grid-template-columns: repeat(2, 1fr); } }
+  .spec {
+    background: var(--surface); border: 1px solid var(--border-light); border-radius: 20px;
+    padding: 18px; box-shadow: var(--shadow-sm);
+  }
+  .spec .k { font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; color: var(--text-tertiary); text-transform: uppercase; }
+  .spec .v { font-family: var(--display); font-weight: 600; font-size: 28px; color: var(--text-primary); margin-top: 8px; }
+  .spec .u { font-size: 12px; font-weight: 400; color: var(--text-tertiary); margin-left: 4px; }
+
+  /* ============== GESTURES & CODE ============== */
+  .gestures { display: grid; grid-template-columns: repeat(7, 1fr); gap: 14px; margin: 24px 0 48px; }
+  @media (max-width: 1100px) { .gestures { grid-template-columns: repeat(4, 1fr); } }
+  @media (max-width: 820px) { .gestures { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 480px) { .gestures { grid-template-columns: 1fr; } }
+  .gesture {
+    background: var(--surface); border: 1px solid var(--border-light); border-radius: 20px;
+    padding: 20px 16px; transition: all 0.2s; box-shadow: var(--shadow-sm);
+  }
+  .gesture:hover { border-color: var(--accent); box-shadow: var(--shadow-md); }
+  .gesture .hand svg { stroke: var(--text-primary); stroke-width: 1.6; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.05)); }
+  .gesture .cmd { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); margin-top: 12px; font-weight: 600; }
+  .gesture .name { font-weight: 600; font-size: 18px; margin-top: 6px; color: var(--text-primary); }
+  .gesture .ru { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+
+  .code-card {
+    background: var(--code-bg); border-radius: 20px; overflow: hidden;
+    border: 1px solid var(--border-light); box-shadow: var(--shadow-sm);
+  }
+  .code-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 20px; background: var(--surface-elevated); border-bottom: 1px solid var(--border-light);
+    font-family: var(--mono); font-size: 11px; color: var(--text-secondary);
+  }
+  pre {
+    margin: 0; padding: 20px 24px; font-family: var(--mono); font-size: 12px; line-height: 1.6;
+    color: var(--text-primary); overflow-x: auto; background: var(--code-bg);
+  }
+  pre .kw { color: #af52de; font-weight: 500; }
+  pre .fn { color: #007aff; }
+  pre .str { color: #34c759; }
+  pre .num { color: #ff9f0a; }
+  pre .com { color: #6c6c70; font-style: italic; }
+
+  .steps { display: flex; flex-direction: column; margin-top: 32px; border-top: 1px solid var(--border-light); }
+  .step { display: grid; grid-template-columns: 90px 1fr; gap: 24px; padding: 22px 0; border-bottom: 1px solid var(--border-light); align-items: start; }
+  .step .n { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; color: var(--accent); font-weight: 600; }
+  .step h4 { font-weight: 600; font-size: 18px; color: var(--text-primary); margin-bottom: 6px; }
+  @media (max-width: 560px) { .step { grid-template-columns: 1fr; gap: 8px; } }
+
+  /* ============== FOOTER ============== */
+  footer {
+    padding: 60px var(--pad) 40px; border-top: 1px solid var(--border-light);
+    background: var(--surface-elevated);
+  }
+  .marquee {
+    display: flex; gap: 40px; font-family: var(--display); font-weight: 600;
+    font-size: clamp(36px, 8vw, 90px); letter-spacing: -0.02em; color: var(--text-primary);
+    white-space: nowrap; animation: marquee 24s linear infinite;
+  }
+  .marquee .stroke { color: var(--accent); }
+  @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .marquee-wrap { overflow: hidden; mask-image: linear-gradient(90deg, transparent, black 5%, black 95%, transparent); }
+  .foot-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 48px;
+    padding-top: 32px; border-top: 1px solid var(--border-light);
+    font-family: var(--mono); font-size: 11px; color: var(--text-tertiary);
+  }
+  .foot-grid h5 { font-weight: 600; color: var(--text-primary); margin-bottom: 12px; font-size: 10px; letter-spacing: 0.12em; }
+  @media (max-width: 760px) { .foot-grid { grid-template-columns: 1fr 1fr; gap: 24px; } }
+
+  .reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .reveal.in { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="bg-shape"><div class="blob"></div><div class="blob2"></div></div>
+
+<nav class="top">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 L22 20 L2 20 Z"/><path d="M12 2 L12 20"/></svg>
+    DARK&nbsp;FAERIE
+  </div>
+  <ul>
+    <li><a href="#s1">01 / Команда</a></li>
+    <li><a href="#s3">02 / Проект</a></li>
+    <li><a href="#s4">03 / Назначение</a></li>
+    <li><a href="#s5">04 / Архитектура</a></li>
+    <li><a href="#s6">05 / Жесты & Код</a></li>
+  </ul>
+  <div class="right"><span class="pulse"></span><span>MQTT&nbsp;→ LEGO&nbsp;Mindstorms</span></div>
+</nav>
+
+<header class="hero">
+  <div class="container">
+    <div class="hero-meta reveal in">
+      <div><span>Команда</span><b>DARK FAERIE</b></div>
+      <div><span>Школа</span><b>LIGA РОБОТОВ</b></div>
+      <div><span>Год</span><b>2026</b></div>
+      <div><span>Стек</span><b>MEDIAPIPE · MQTT · LEGO&nbsp;MINDSTORMS</b></div>
+    </div>
+    <h1 class="reveal in" data-d="1">
+      <span class="gradient-text">Управление</span><br>
+      <span class="light-stroke">роботом жестами</span><br>
+      <span class="gradient-text">руки.</span>
+    </h1>
+    <div class="hero-sub reveal in" data-d="2">
+      <p class="lede">Распознаём семь жестов в реальном времени → отправляем команду через MQTT → робот LEGO Mindstorms выполняет движение. Без проводов и контроллеров.</p>
+      <div class="scroll-cue"><span class="dash"></span><span>Исследовать</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- 01: НАЗВАНИЕ КОМАНДЫ (без личных данных) -->
+<section id="s1">
+  <div class="container">
+    <div class="sec-head reveal">
+      <div><div class="label"><span>01</span>&nbsp;&nbsp;КОМАНДА</div><h2 style="margin-top: 12px;">DARK FAERIE.</h2></div>
+      <div class="right"><p>Название команды объединяет магию технологий и скрытые сигналы — жесты превращаются в команды для робота.</p></div>
+    </div>
+    <div class="team-block reveal">
+      <div>
+        <div class="team-name">DARK&nbsp;<span class="accent-word">FAERIE</span></div>
+        <div class="team-tags"><span class="tag">LIGA РОБОТОВ</span><span class="tag">CV + IoT</span><span class="tag">LEGO Mindstorms</span><span class="tag">Gesture Control</span></div>
+      </div>
+      <div class="crest">⚡</div>
+    </div>
+  </div>
+</section>
+
+<!-- 03: НАЗВАНИЕ ПРОЕКТА -->
+<section id="s3">
+  <div class="container">
+    <div class="sec-head reveal"><div><div class="label"><span>02</span>&nbsp;&nbsp;ПРОЕКТ</div><h2 style="margin-top: 12px;">Gesture Link.</h2></div><div class="right"><p>От жеста к движению LEGO-робота за доли секунды.</p></div></div>
+    <div class="reveal">
+      <div class="project-name">Управление роботом —<br><span class="gradient-text">жестами руки</span></div>
+      <div class="project-meta"><div><div class="k">Кодовое имя</div><div class="v">GESTURE LINK</div></div><div><div class="k">Тип</div><div class="v">CV + MQTT + LEGO</div></div><div><div class="k">Команд</div><div class="v">7 жестов</div></div><div><div class="k">Канал</div><div class="v">MQTT (EMQX)</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 04: НАЗНАЧЕНИЕ -->
+<section id="s4" class="why">
+  <div class="container">
+    <div class="sec-head reveal"><div><div class="label"><span>03</span>&nbsp;&nbsp;НАЗНАЧЕНИЕ</div><h2 style="margin-top: 12px;">Кому и зачем.</h2></div><div class="right"><p>Бесконтактное управление — естественный интерфейс для роботов.</p></div></div>
+    <div class="why-grid reveal">
+      <div class="card"><div class="icon">🎓</div><div><h3>Образование</h3><p>Наглядный пример работы нейросети, MQTT и робототехники для уроков LIGA РОБОТОВ.</p></div></div>
+      <div class="card"><div class="icon">🩺</div><div><h3>Медицина</h3><p>Стерильное управление оборудованием без касания.</p></div></div>
+      <div class="card"><div class="icon">🏭</div><div><h3>Промышленность</h3><p>Оператор управляет манипулятором жестами, не отвлекаясь от задач.</p></div></div>
+      <div class="card"><div class="icon">🏠</div><div><h3>Умный дом</h3><p>Управление техникой жестами через камеру.</p></div></div>
+      <div class="card"><div class="icon">♿</div><div><h3>Ассистивные технологии</h3><p>Помощь людям с ограниченной подвижностью.</p></div></div>
+      <div class="card"><div class="icon">🎮</div><div><h3>Игры</h3><p>Бесконтактный контроллер для роботов-игрушек.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 05: КОНСТРУКЦИЯ / АРХИТЕКТУРА -->
+<section id="s5">
+  <div class="container">
+    <div class="sec-head reveal"><div><div class="label"><span>04</span>&nbsp;&nbsp;АРХИТЕКТУРА</div><h2 style="margin-top: 12px;">Как это работает.</h2></div><div class="right"><p>От веб-камеры до колёс LEGO — полный pipeline.</p></div></div>
+    <div class="pipeline reveal">
+      <div><span class="n">01</span><div class="ic">📷</div><div class="ttl">Веб-камера</div><div class="desc">Захват видео 640x480, кадры в Python</div></div>
+      <div><span class="n">02</span><div class="ic">🧠</div><div class="ttl">MediaPipe Hands</div><div class="desc">21 ключевая точка, детекция руки</div></div>
+      <div><span class="n">03</span><div class="ic">⚙️</div><div class="ttl">Классификатор</div><div class="desc">Счёт поднятых пальцев → определение жеста</div></div>
+      <div><span class="n">04</span><div class="ic">📡</div><div class="ttl">MQTT Broker</div><div class="desc">Публикация команды (emqx)</div></div>
+      <div><span class="n">05</span><div class="ic">🤖</div><div class="ttl">LEGO Mindstorms</div><div class="desc">Подписка → исполнение движения</div></div>
+    </div>
+    <div class="specs reveal"><div class="spec"><div class="k">Распознавание</div><div class="v">21<span class="u">точка</span></div></div><div class="spec"><div class="k">Жестов</div><div class="v">7<span class="u">команд</span></div></div><div class="spec"><div class="k">Стабилизация</div><div class="v">5<span class="u">кадров</span></div></div><div class="spec"><div class="k">Платформа</div><div class="v">LEGO<span class="u">Mindstorms</span></div></div></div>
+  </div>
+</section>
+
+<!-- 06: ЖЕСТЫ И ПРОГРАММА (связь с LEGO MINDSTORMS) -->
+<section id="s6">
+  <div class="container">
+    <div class="sec-head reveal"><div><div class="label"><span>05</span>&nbsp;&nbsp;ЖЕСТЫ & ПРОГРАММА</div><h2 style="margin-top: 12px;">Семь команд для робота.</h2></div><div class="right"><p>Жест → MQTT-сообщение → LEGO Mindstorms исполняет.</p></div></div>
+    
+    <div class="gestures reveal">
+      <div class="gesture"><div class="hand"><svg width="60" height="70" viewBox="0 0 60 70" fill="none" stroke="currentColor"><path d="M14 68 V36 a6 6 0 0 1 12 0 V14 a4 4 0 0 1 8 0 V16 a4 4 0 0 1 8 0 V20 a4 4 0 0 1 8 0 V38"/><path d="M10 46 a6 6 0 0 1 6-6"/></svg></div><div class="cmd">stop</div><div class="name">Открытая ладонь</div><div class="ru">4 пальца → стоп</div></div>
+      <div class="gesture"><div class="hand"><svg width="60" height="70" viewBox="0 0 60 70" fill="none" stroke="currentColor"><path d="M12 68 V38 a8 8 0 0 1 16 0 V16 a4 4 0 0 1 8 0 V40 a8 8 0 0 1 -8 8"/></svg></div><div class="cmd">forward</div><div class="name">Указательный</div><div class="ru">1 палец → вперёд</div></div>
+      <div class="gesture"><div class="hand"><svg width="60" height="70" viewBox="0 0 60 70" fill="none" stroke="currentColor"><path d="M12 68 V36 a4 4 0 0 1 8 0 V14 a4 4 0 0 1 8 0 V14 a4 4 0 0 1 8 0 V40"/></svg></div><div class="cmd">right</div><div class="name">Два пальца</div><div class="ru">2 → поворот вправо</div></div>
+      <div class="gesture"><div class="hand"><svg width="60" height="70" viewBox="0 0 60 70" fill="none" stroke="currentColor"><path d="M10 68 V36 a4 4 0 0 1 8 0 V14 a4 4 0 0 1 8 0 V14 a4 4 0 0 1 8 0 V14 a4 4 0 0 1 8 0 V38"/></svg></div><div class="cmd">left</div><div class="name">Три пальца</div><div class="ru">3 → поворот влево</div></div>
+      <div class="gesture"><div class="hand"><svg width="60" height="70" viewBox="0 0 60 70" fill="none" stroke="currentColor"><path d="M12 68 V46 a14 14 0 0 1 14 -14 h8 a6 6 0 0 0 0 -12 h-4 a14 14 0 0 0 -14 14 V46"/></svg></div><div class="cmd">back</div><div class="name">Кулак</div><div class="ru">0 пальцев → назад</div></div>
+      <div class="gesture"><div class="hand"><svg width="60" height="70" viewBox="0 0 60 70" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><!-- кулак: прямоугольник снизу --><rect x="14" y="38" width="32" height="26" rx="5"/><!-- большой палец вверх --><path d="M14 44 Q10 44 10 36 Q10 22 20 22 Q24 22 24 28 V38"/></svg></div><div class="cmd">like</div><div class="name">Палец вверх</div><div class="ru">лайк → сжать захват</div></div>
+      <div class="gesture"><div class="hand"><svg width="60" height="70" viewBox="0 0 60 70" fill="none" stroke="currentColor"><circle cx="22" cy="24" r="11"/><path d="M30 30 V14 a4 4 0 0 1 8 0 V14 a4 4 0 0 1 8 0 V16 a4 4 0 0 1 8 0 V40 a16 16 0 0 1 -16 16 h-6 a14 14 0 0 1 -14 -14"/></svg></div><div class="cmd">ok</div><div class="name">Жест ОК</div><div class="ru">ок → разжать захват</div></div>
+    </div>
+
+    <div class="program-grid reveal" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      <div class="code-card"><div class="code-head"><span>gesture_classifier.py</span><div class="dots">⚫⚫⚫</div></div><pre><span class="com"># Подсчёт поднятых пальцев</span>
+<span class="kw">def</span> <span class="fn">recognize_gesture</span>(landmarks):
+    <span class="kw">def</span> <span class="fn">is_up</span>(tip, pip):
+        <span class="kw">return</span> landmarks[tip].y &lt; landmarks[pip].y
+    fingers = [<span class="fn">is_up</span>(<span class="num">8</span>,<span class="num">6</span>), <span class="fn">is_up</span>(<span class="num">12</span>,<span class="num">10</span>), 
+               <span class="fn">is_up</span>(<span class="num">16</span>,<span class="num">14</span>), <span class="fn">is_up</span>(<span class="num">20</span>,<span class="num">18</span>)]
+    cnt = <span class="fn">sum</span>(fingers)
+    <span class="kw">if</span> cnt == <span class="num">4</span>: <span class="kw">return</span> <span class="str">"stop"</span>
+    <span class="kw">if</span> cnt == <span class="num">0</span>: <span class="kw">return</span> <span class="str">"back"</span>
+    <span class="kw">if</span> cnt == <span class="num">1</span> <span class="kw">and</span> fingers[<span class="num">0</span>]: <span class="kw">return</span> <span class="str">"forward"</span>
+    <span class="kw">if</span> cnt == <span class="num">2</span> <span class="kw">and</span> fingers[<span class="num">0</span>] <span class="kw">and</span> fingers[<span class="num">1</span>]: <span class="kw">return</span> <span class="str">"right"</span>
+    <span class="kw">if</span> cnt == <span class="num">3</span>: <span class="kw">return</span> <span class="str">"left"</span>
+    <span class="com"># большой палец вверх → like (сжать)</span>
+    <span class="kw">if</span> cnt == <span class="num">0</span> <span class="kw">and</span> <span class="fn">thumb_up</span>(landmarks): <span class="kw">return</span> <span class="str">"like"</span>
+    <span class="com"># кольцо большой+указательный → ok (разжать)</span>
+    <span class="kw">if</span> <span class="fn">is_ok_sign</span>(landmarks): <span class="kw">return</span> <span class="str">"ok"</span>
+    <span class="kw">return</span> <span class="str">"none"</span></pre></div>
+      <div class="code-card"><div class="code-head"><span>mqtt_publisher.py</span><div class="dots">⚫⚫⚫</div></div><pre><span class="com"># Стабилизация и отправка в MQTT</span>
+client = mqtt.<span class="fn">Client</span>()
+client.<span class="fn">connect</span>(<span class="str">"broker.emqx.io"</span>, <span class="num">1883</span>)
+history = []
+<span class="kw">while</span> <span class="kw">True</span>:
+    gesture = <span class="fn">recognize_gesture</span>(landmarks)
+    history.<span class="fn">append</span>(gesture)
+    <span class="kw">if</span> <span class="fn">len</span>(history) &gt; <span class="num">5</span>: history.<span class="fn">pop</span>(<span class="num">0</span>)
+    stable = <span class="fn">max</span>(<span class="fn">set</span>(history), key=history.count)
+    <span class="kw">if</span> stable != <span class="str">"none"</span> <span class="kw">and</span> stable != last_cmd:
+        client.<span class="fn">publish</span>(<span class="str">"ligarobotov/darkfaerie"</span>, stable)
+        last_cmd = stable</pre></div>
+    </div>
+
+    <h3 style="margin-top: 48px; font-size: 14px; letter-spacing: 0.18em; color: var(--accent);">— Связь с LEGO Mindstorms</h3>
+    <div class="steps reveal">
+      <div class="step"><span class="n">→ MQTT</span><div><h4>Робот подписан на топик</h4><p>На LEGO EV3 запущен скрипт на MicroPython, который слушает топик <code style="background:#eef; padding:2px 6px; border-radius:8px;">ligarobotov/darkfaerie</code> и преобразует команды в движения моторов.</p></div></div>
+      <div class="step"><span class="n">→ forward</span><div><h4>Движение вперёд</h4><p>Оба мотора вращаются вперёд. Робот едет прямо.</p></div></div>
+      <div class="step"><span class="n">→ back</span><div><h4>Движение назад</h4><p>Оба мотора вращаются назад.</p></div></div>
+      <div class="step"><span class="n">→ left / right</span><div><h4>Повороты на месте</h4><p>Один мотор вращается вперёд, другой назад — робот разворачивается.</p></div></div>
+      <div class="step"><span class="n">→ stop</span><div><h4>Немедленная остановка</h4><p>Моторы блокируются. Безопасное торможение.</p></div></div>
+      <div class="step"><span class="n">→ like</span><div><h4>Сжатие захвата</h4><p>Мотор захвата вращается до упора — клешня смыкается и удерживает объект.</p></div></div>
+      <div class="step"><span class="n">→ ok</span><div><h4>Разжатие захвата</h4><p>Мотор захвата вращается в обратную сторону — клешня раскрывается и отпускает объект.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="marquee-wrap"><div class="marquee"><span>DARK&nbsp;FAERIE</span><span class="stroke">GESTURE LINK</span><span>⚡</span><span>LEGO&nbsp;MINDSTORMS</span><span>MQTT</span><span>DARK&nbsp;FAERIE</span><span class="stroke">GESTURE LINK</span><span>⚡</span><span>LEGO&nbsp;MINDSTORMS</span></div></div>
+  <div class="container foot-grid">
+    <div><h5>Команда</h5><p>DARK FAERIE</p><p>LIGA РОБОТОВ</p></div>
+    <div><h5>Стек</h5><p>Python · MediaPipe · MQTT</p><p>LEGO Mindstorms EV3</p></div>
+    <div><h5>MQTT</h5><p>broker.emqx.io</p><p>topic: /ligarobotov/darkfaerie</p></div>
+    <div><h5>Презентация</h5><p>17.05.2026</p><p>Gesture + LEGO в действии</p></div>
+  </div>
+</footer>
+
+<script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if(e.isIntersecting) { e.target.classList.add('in'); observer.unobserve(e.target); } });
+  }, { threshold: 0.1, rootMargin: '0px 0px -30px 0px' });
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', (e) => {
+      const id = anchor.getAttribute('href');
+      if(id && id.length > 1) {
+        const target = document.querySelector(id);
+        if(target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      }
+    });
+  });
+</script>
+</body>
+</html>
